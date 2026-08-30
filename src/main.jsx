@@ -92,7 +92,7 @@ function App() {
       candidateMaterials:
         "我和两位同学完成了一个用最优控制做语言模型预训练数据筛选的复现项目。我个人负责数据选择器、costate 近似训练循环、数据来源分层和消融实验。我们使用 1.2 亿 token 语料和 125M decoder-only Transformer，比较 Uniform、Perplexity、Gradient-norm 与 PDS。PDS 将达到相同验证损失所需 token 从 100M 降到 76M，验证集 loss 为 3.02；但选择器需要额外计算，且小模型结果不能直接推广到 400B 模型。我还复现了在线 pairwise learning-to-rank 原型，发现 uncertainty-only exploration 在点击偏差强时会过早相信错误排序。",
       presentation:
-        "我的陈述分为研究问题、方法直觉、系统实现、实验结果、失败与局限、下一步研究六部分。",
+        "各位老师好，我是陈同学，本科读计算机科学与技术。平时我比较喜欢机器学习里需要做判断的问题，比如数据怎么选、什么时候应该继续探索。今天我想重点介绍一个三人小组的复现项目，主题是语言模型预训练时的数据选择。我们用一个 125M 的小模型比较了随机抽样、perplexity、gradient-norm 和 PDS。PDS 达到同一个验证损失时大约用了 76M token，随机抽样大约是 100M。不过我不想把它直接说成节省了真实算力，因为选择器本身也要额外计算。我主要负责选择器、近似 costate 更新、数据分层和实验，中间还排查过选择器偏爱短文本的问题。这个结果目前只能说明小规模设置下的趋势，下一步我会把选择开销和训练开销放进同一个 FLOPs 目标里。我的介绍到这里，谢谢老师。",
       professorName: "周教授（脱敏画像）",
       affiliation: "华北某重点大学 · 决策智能与交互学习实验室",
       researchDirection:
@@ -125,6 +125,11 @@ function App() {
     if (!text) return;
     const topic =
       profile.agenda[Math.min(segments.length, profile.agenda.length - 1)];
+    const history = segments.slice(-6);
+    const topicSegments = segments.filter((segment) =>
+      topic?.candidate_evidence && segment.text.toLowerCase().includes(String(topic.candidate_evidence).slice(0, 24).toLowerCase()),
+    );
+    const fullText = [...segments.map((segment) => segment.text), text].join(" ");
     setAiBusy(true);
     const decision = await decideInterruptionAI({
       text,
@@ -137,6 +142,10 @@ function App() {
       interruptionCount: interruptions.length,
       lastInterruptionAt: interruptions.at(-1)?.at ?? null,
       topic: topic?.topic,
+      history,
+      priorInterruptions: interruptions,
+      topicCoverage: topicSegments.length ? `已有 ${topicSegments.length} 段与当前议题相关的内容` : "尚未形成明确覆盖",
+      hasLaterEvidence: /\d|我负责|我的主要工作|具体|基线|对照/.test(fullText),
     });
     setAiBusy(false);
     const reason = decision.reason;
@@ -184,6 +193,17 @@ function App() {
       qaLog: answerLog,
       evidence: analyzeEvidence(segments, answerLog),
       duration: elapsed,
+      overallImpression: "本轮记录已完成，建议结合下方证据复盘表达和科研回答。",
+      strengths: ["完成了完整的个人陈述", interruptions.length ? "在教授打断后继续完成了陈述" : "保持了连续的陈述节奏"],
+      dimensions: [
+        { name: "科研理解", score: 3, evidence: "证据不足", observation: "需要更多完整回答才能判断。", impact: "教授难以确认理解深度。" },
+        { name: "个人贡献", score: 3, evidence: "证据不足", observation: "需要明确说明亲自完成的工作。", impact: "个人能力边界不够清晰。" },
+        { name: "证据与严谨性", score: 3, evidence: "证据不足", observation: "需要用关键数字和对照支撑结论。", impact: "结论可信度有限。" },
+        { name: "方法取舍与研究思维", score: 3, evidence: "证据不足", observation: "需要说明替代方案和失败边界。", impact: "研究判断力仍需更多证据。" },
+        { name: "表达结构", score: 3, evidence: "证据不足", observation: "需要结合完整录音或文字判断。", impact: "暂不能判断表达效率。" },
+        { name: "打断恢复", score: score ? Math.round(score / 20) : 3, evidence: "面试过程记录", observation: "根据打断次数和恢复耗时估计。", impact: "反映临场调整能力。" },
+      ],
+      priorityImprovements: [],
     };
     setAiBusy(true);
     const next = await generateReportAI({ profile, segments, qaLog: answerLog, fallback });
@@ -760,6 +780,29 @@ function Report({ profile, report, reset }) {
           {profile.professor_profile.name} ·{" "}
           {profile.professor_profile.affiliation}
         </p>
+        {report.overallImpression && (
+          <section className="overall panel">
+            <h2>教授整体印象</h2>
+            <p>{report.overallImpression}</p>
+            {report.strengths?.length > 0 && (
+              <div className="strengths"><b>做得好的地方</b><ul>{report.strengths.map((item, index) => <li key={index}>{item}</li>)}</ul></div>
+            )}
+          </section>
+        )}
+        {report.dimensions?.length > 0 && (
+          <section className="dimensions panel">
+            <h2>能力维度评分</h2>
+            <div className="dimension-list">
+              {report.dimensions.map((item, index) => (
+                <div className="dimension" key={`${item.name}-${index}`}>
+                  <div className="dimension-head"><strong>{item.name}</strong><b>{item.score}/5</b></div>
+                  <p>{item.observation}</p>
+                  <small>依据：{item.evidence || "证据不足"}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="score-grid">
           <div className="score panel">
             <span>INTERRUPTION RECOVERY</span>
@@ -785,19 +828,20 @@ function Report({ profile, report, reset }) {
           </div>
         </div>
         <section className="evidence panel">
-          <h2>逐条证据反馈</h2>
-          {report.evidence?.length ? (
-            report.evidence.map((item, index) => (
+          <h2>最影响判断的问题</h2>
+          {report.priorityImprovements?.length || report.evidence?.length ? (
+            (report.priorityImprovements || report.evidence).map((item, index) => (
               <div className="finding" key={`${item.tag}-${index}`}>
                 <div className="finding-top">
                   <b>{String(index + 1).padStart(2, "0")}</b>
-                  <span>{item.tag}</span>
+                  <span>{item.category || item.tag || "证据反馈"}</span>
                 </div>
                 <blockquote>“{item.quote}”</blockquote>
                 <p>
                   <strong>问题：</strong>
                   {item.issue}
                 </p>
+                {item.impact && <p><strong>影响：</strong>{item.impact}</p>}
                 <p>
                   <strong>建议：</strong>
                   {item.advice}

@@ -42,8 +42,8 @@ export async function decideInterruptionAI(context) {
   if (context.lastInterruptionAt !== null && Math.abs(context.lastInterruptionAt - context.secondsLeft) < 35) return { type: "CONTINUE" };
   try {
     const content = await askDeepSeek([
-      { role: "system", content: "你是严格受控的复试教授。只返回 JSON：{\"type\":\"CONTINUE|INTERRUPT|END_TOPIC|SWITCH_TOPIC\",\"reason\":\"...\",\"question\":\"...\"}。只有候选人本段出现明确研究兴趣、可验证证据缺口、方法取舍或个人贡献问题时才打断；不要因为时间或泛泛表达打断。" },
-      { role: "user", content: `教授研究兴趣：${context.interests.join(", ")}\n当前议题：${context.topic || "未知"}\n候选人本段：${context.text}` },
+      { role: "system", content: "你是严格受控的保研复试教授。只返回 JSON：{\"type\":\"CONTINUE|INTERRUPT|END_TOPIC|SWITCH_TOPIC\",\"reason\":\"...\",\"question\":\"...\"}。根据完整上下文判断是否真的需要打断。只有当前内容出现明确的研究兴趣、可验证证据缺口、方法取舍或个人贡献问题，且历史内容尚未充分回答时才打断；不要因为时间、泛泛表达或单个关键词打断。若已经覆盖当前议题，优先 END_TOPIC 或 SWITCH_TOPIC。" },
+      { role: "user", content: `教授研究兴趣：${context.interests.join(", ")}\n当前议题：${context.topic || "未知"}\n议题覆盖摘要：${context.topicCoverage || "尚未覆盖"}\n已讲段落：${JSON.stringify(context.history || [])}\n已经触发的打断：${JSON.stringify(context.priorInterruptions || [])}\n当前候选人本段：${context.text}\n本段之后可见的证据：${context.hasLaterEvidence ? "已有补充证据" : "暂无"}` },
     ]);
     const result = jsonFrom(content);
     if (!["CONTINUE", "INTERRUPT", "END_TOPIC", "SWITCH_TOPIC"].includes(result.type)) throw new Error("invalid decision");
@@ -73,12 +73,19 @@ export async function generateQuestionsAI(profile) {
 export async function generateReportAI({ profile, segments, qaLog, fallback }) {
   try {
     const content = await askDeepSeek([
-      { role: "system", content: "你是保研复试反馈教练。只返回 JSON 数组，每项包含 tag, quote, issue, advice。quote 必须逐字引用候选人原话，不得编造。最多返回 5 项。" },
+      { role: "system", content: "你是有经验的保研复试教授。请基于完整面试记录和教授 agenda 返回合法 JSON 对象，不要 Markdown。对象必须包含 overall_impression(整体印象字符串)、strengths(2-4 条具体优点数组)、dimensions(数组，固定包含科研理解、个人贡献、证据与严谨性、方法取舍与研究思维、表达结构、打断恢复六项；每项包含 name, score(1-5), evidence(逐字原话或‘证据不足’), observation, impact)、priority_improvements(最多3项，每项包含 quote, category(事实错误|证据不足|表达可以更紧凑), issue, impact, advice)。只评价记录中有依据的内容；没有证据时写‘证据不足’，不要臆测；已经在后文补充的内容不能重复批评。" },
       { role: "user", content: `教授画像：${JSON.stringify(profile.professor_profile)}\n陈述：${JSON.stringify(segments)}\n问答：${JSON.stringify(qaLog)}` },
     ]);
-    const evidence = jsonFrom(content);
-    if (!Array.isArray(evidence)) throw new Error("invalid report");
-    return { ...fallback, evidence: evidence.slice(0, 5) };
+    const report = jsonFrom(content);
+    if (!report || typeof report !== "object" || !Array.isArray(report.dimensions)) throw new Error("invalid report");
+    return {
+      ...fallback,
+      overallImpression: report.overall_impression || fallback.overallImpression,
+      strengths: Array.isArray(report.strengths) ? report.strengths.slice(0, 4) : fallback.strengths,
+      dimensions: report.dimensions.slice(0, 6),
+      priorityImprovements: Array.isArray(report.priority_improvements) ? report.priority_improvements.slice(0, 3) : fallback.priorityImprovements,
+      evidence: Array.isArray(report.priority_improvements) ? report.priority_improvements.slice(0, 5) : fallback.evidence,
+    };
   } catch (error) {
     console.warn("DeepSeek report fallback:", error.message);
     return { ...fallback, evidence: analyzeEvidence(segments, qaLog) };
