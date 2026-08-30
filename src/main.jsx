@@ -102,8 +102,8 @@ function App() {
     setInterruption(null);
     setStage("presenting");
   };
-  const submitSegment = () => {
-    const text = transcript.trim();
+  const submitSegment = (textOverride) => {
+    const text = (textOverride ?? transcript).trim();
     if (!text) return;
     const lower = text.toLowerCase();
     const topic =
@@ -568,7 +568,7 @@ function Presentation({
               <ShieldAlert size={14} /> Controller 会检查内容并决定是否打断
             </span>
             <span className="input-buttons">
-              <VoiceButton voiceStatus={voiceStatus} setVoiceStatus={setVoiceStatus} setTranscript={setTranscript} />
+              <VoiceButton voiceStatus={voiceStatus} setVoiceStatus={setVoiceStatus} setTranscript={setTranscript} onSegment={submitSegment} />
               <button onClick={submitSegment}>
                 <Send size={15} /> Submit segment
               </button>
@@ -755,9 +755,12 @@ function Report({ profile, report, reset }) {
     </main>
   );
 }
-function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript }) {
+function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript, onSegment }) {
   const recognitionRef = useRef(null);
   const activeRef = useRef(false);
+  const bufferRef = useRef("");
+  const onSegmentRef = useRef(onSegment); onSegmentRef.current = onSegment;
+  React.useEffect(() => { const id = window.setInterval(() => { if (!activeRef.current) return; const text = bufferRef.current.trim(); if (!text) return; bufferRef.current = ""; setTranscript(""); onSegmentRef.current(text); }, 15000); return () => window.clearInterval(id); }, []);
   const toggle = () => {
     if (!window.isSecureContext) return setVoiceStatus("secure-required");
     const API = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -780,7 +783,7 @@ function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript }) {
       let chunk = "";
       for (let i = event.resultIndex; i < event.results.length; i += 1)
         if (event.results[i].isFinal) chunk += event.results[i][0].transcript;
-      if (chunk) setTranscript((value) => `${value} ${chunk}`.trim());
+      if (chunk) { bufferRef.current = `${bufferRef.current} ${chunk}`.trim(); setTranscript((value) => `${value} ${chunk}`.trim()); }
     };
     recognition.onerror = (event) => {
       if (
