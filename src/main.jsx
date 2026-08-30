@@ -147,9 +147,18 @@ function App() {
       setQaAnswer("我主要负责选择器实现、数据分层和消融实验，理论部分是和组员共同完成的。这个结论目前只在小规模设置下成立，选择器额外开销还需要单独核算。");
       return;
     }
-    const next = chunks[demoExampleIndex] || chunks[0] || String(form.presentation || "").trim();
+    const usedText = segments.map((segment) => String(segment.text || "").replace(/\s/g, "").slice(0, 40));
+    let cursor = demoExampleIndex;
+    while (chunks.length > 1 && cursor < demoExampleIndex + chunks.length) {
+      const candidate = chunks[cursor % chunks.length];
+      const normalized = candidate.replace(/\s/g, "");
+      const duplicate = usedText.some((prefix) => prefix.length > 12 && (normalized.includes(prefix) || prefix.includes(normalized.slice(0, 24))));
+      if (!duplicate) break;
+      cursor += 1;
+    }
+    const next = chunks[cursor % chunks.length] || chunks[0] || String(form.presentation || "").trim();
     setTranscript(next);
-    setDemoExampleIndex((index) => chunks.length ? (index + 1) % chunks.length : index);
+    setDemoExampleIndex((cursor + 1) % chunks.length);
   };
   const submitSegment = async (textOverride) => {
     const text = (textOverride ?? transcript).trim();
