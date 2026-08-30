@@ -47,6 +47,14 @@ const initial = {
 
 const modeLabels = { none: "静默观察", kind: "标准追问", pressure: "高压追问" };
 
+function presentationChunks(text) {
+  const sentences = String(text || "").split(/(?<=[。！？!?])/).map((part) => part.trim()).filter(Boolean);
+  if (!sentences.length && String(text || "").trim()) return [String(text).trim()];
+  const chunks = [];
+  for (let index = 0; index < sentences.length; index += 2) chunks.push(sentences.slice(index, index + 2).join(""));
+  return chunks;
+}
+
 function App() {
   const [form, setForm] = useState(
     () => JSON.parse(sessionStorage.getItem("aiic-setup") || "null") || initial,
@@ -124,24 +132,24 @@ function App() {
     setSeconds(Number(form.duration) * 60);
     setElapsedSeconds(0);
     setSegments([]);
-    setTranscript(form.presentation.trim());
+    const chunks = presentationChunks(form.presentation);
+    setTranscript(chunks[0] || "");
     setInterruption(null);
     setInterruptions([]);
     setQaAnswer("");
     setQaLog([]);
-    setDemoExampleIndex(0);
+    setDemoExampleIndex(chunks.length > 1 ? 1 : 0);
     setStage("presenting");
   };
   const fillExample = (target = "presentation") => {
-    const source = String(form.presentation || "").trim();
-    const parts = source.split(/(?<=[。！？!?])/).map((part) => part.trim()).filter(Boolean);
+    const chunks = presentationChunks(form.presentation);
     if (target === "interruption") {
       setQaAnswer("我主要负责选择器实现、数据分层和消融实验，理论部分是和组员共同完成的。这个结论目前只在小规模设置下成立，选择器额外开销还需要单独核算。");
       return;
     }
-    const next = parts.slice(demoExampleIndex, demoExampleIndex + 2).join("") || source;
+    const next = chunks[demoExampleIndex] || chunks[0] || String(form.presentation || "").trim();
     setTranscript(next);
-    setDemoExampleIndex((index) => parts.length ? (index + 2) % parts.length : index);
+    setDemoExampleIndex((index) => chunks.length ? (index + 1) % chunks.length : index);
   };
   const submitSegment = async (textOverride) => {
     const text = (textOverride ?? transcript).trim();
