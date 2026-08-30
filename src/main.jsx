@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { generateProfessorProfile } from "./profile";
 import { decideInterruption } from "./controller";
+import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI } from "./ai";
 import { calculateRecoveryScore } from "./scoring";
 import { analyzeEvidence } from "./feedback";
 import "./styles.css";
@@ -52,9 +53,10 @@ function App() {
   const [report, setReport] = useState(null);
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [error, setError] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const update = (key) => (event) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
-  const generate = (event) => {
+  const generate = async (event) => {
     event.preventDefault();
     if (
       !form.candidateMaterials.trim() ||
@@ -64,12 +66,14 @@ function App() {
       setError("请至少填写候选人材料、教授姓名和研究方向。");
       return;
     }
-    const next = generateProfessorProfile(form);
+    setAiBusy(true);
+    const next = await generateProfessorProfileAI(form);
     setProfile(next);
     setStage("profile");
     setError("");
     sessionStorage.setItem("aiic-setup", JSON.stringify(form));
     sessionStorage.setItem("aiic-profile", JSON.stringify(next));
+    setAiBusy(false);
   };
   const fillDemo = () =>
     setForm({
@@ -105,13 +109,13 @@ function App() {
     setInterruption(null);
     setStage("presenting");
   };
-  const submitSegment = (textOverride) => {
+  const submitSegment = async (textOverride) => {
     const text = (textOverride ?? transcript).trim();
     if (!text) return;
-    const lower = text.toLowerCase();
     const topic =
       profile.agenda[Math.min(segments.length, profile.agenda.length - 1)];
-    const decision = decideInterruption({
+    setAiBusy(true);
+    const decision = await decideInterruptionAI({
       text,
       interests: profile.professor_profile.research_interests,
       secondsLeft: seconds,
@@ -121,7 +125,9 @@ function App() {
       mode: form.interruptionMode,
       interruptionCount: interruptions.length,
       lastInterruptionAt: interruptions.at(-1)?.at ?? null,
+      topic: topic?.topic,
     });
+    setAiBusy(false);
     const reason = decision.reason;
     const question = decision.question;
     const entry = { text, at: seconds, speaker: "candidate" };
@@ -150,18 +156,24 @@ function App() {
     setInterruption(null);
     setStage("presenting");
   };
-  const endPresentation = () => {
+  const endPresentation = async () => {
     setStage("qa");
     setQaIndex(0);
+    if (profile && !profile.aiQuestions) {
+      const questions = await generateQuestionsAI(profile);
+      const next = { ...profile, aiQuestions: questions };
+      setProfile(next);
+      sessionStorage.setItem("aiic-profile", JSON.stringify(next));
+    }
   };
   const currentQuestion =
-    profile?.agenda?.[qaIndex]?.questions?.[
+    profile?.aiQuestions?.[qaIndex] || profile?.agenda?.[qaIndex]?.questions?.[
       qaLog.filter((x) => x.topic === profile?.agenda?.[qaIndex]?.topic)
         .length || 0
     ] ||
     profile?.agenda?.[qaIndex]?.questions?.[0] ||
     "你希望在研究生阶段继续探索什么问题？";
-  const submitAnswer = (e) => {
+  const submitAnswer = async (e) => {
     e.preventDefault();
     if (!qaAnswer.trim()) return;
     const nextLog = [
@@ -183,7 +195,7 @@ function App() {
         elapsedSeconds: elapsed,
         totalSeconds: Number(form.duration) * 60,
       });
-      const next = {
+      const fallback = {
         recovery: score,
         interruptionCount: interruptions.length,
         interruptionDuration: interruptions.length * 12,
@@ -192,6 +204,9 @@ function App() {
         evidence: analyzeEvidence(segments, nextLog),
         duration: elapsed,
       };
+      setAiBusy(true);
+      const next = await generateReportAI({ profile, segments, qaLog: nextLog, fallback });
+      setAiBusy(false);
       setReport(next);
       sessionStorage.setItem("aiic-report", JSON.stringify(next));
       setStage("report");
@@ -409,7 +424,7 @@ function App() {
               </select>
             </label>
             <button type="submit">
-              生成模拟教授 <ArrowRight size={17} />
+              {aiBusy ? "正在分析材料…" : "生成模拟教授"} <ArrowRight size={17} />
             </button>
           </div>
           {error && <p className="error">{error}</p>}
