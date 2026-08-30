@@ -574,6 +574,8 @@ function Presentation({
               </button>
             </span>
           </div>
+          {voiceStatus === "listening" && <p className="voice-ready" aria-live="polite"><span /> 可以开始说话</p>}
+          {voiceStatus === "reconnecting" && <p className="voice-hint" aria-live="polite">正在重新连接语音识别…</p>}
           {voiceStatus === "unsupported" && (
             <p className="voice-hint">
               当前浏览器不支持语音识别，请继续使用文字输入。
