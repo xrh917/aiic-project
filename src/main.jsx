@@ -577,7 +577,7 @@ function Presentation({
                 setTranscript={setTranscript}
                 onSegment={submitSegment}
               />
-              <button onClick={submitSegment}>
+              <button type="button" onClick={() => submitSegment()}>
                 <Send size={15} /> Submit segment
               </button>
             </span>
