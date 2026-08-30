@@ -32,14 +32,6 @@ function App() {
     setProfile(next); setStage('profile'); setError(''); sessionStorage.setItem('aiic-setup', JSON.stringify(form)); sessionStorage.setItem('aiic-profile', JSON.stringify(next));
   };
   React.useEffect(() => { if (stage !== 'presenting') return; const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000); return () => clearInterval(id); }, [stage]);
-  React.useEffect(() => {
-    if (stage !== 'presenting' || !segments.length || interruptions.length) return;
-    const elapsed = Number(form.duration) * 60 - seconds;
-    if (elapsed >= 90) {
-      const item = { reason: 'TIME CONTROL', question: '这一部分不用继续展开，请直接说你的核心贡献。', at: seconds };
-      setInterruption(item); setInterruptions([item]); setStage('interrupted');
-    }
-  }, [stage, seconds, segments.length, interruptions.length, form.duration]);
   const startPresentation = () => { setSeconds(Number(form.duration) * 60); setSegments([]); setTranscript(''); setInterruption(null); setStage('presenting'); };
   const submitSegment = () => {
     const text = transcript.trim(); if (!text) return;
