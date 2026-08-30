@@ -1,82 +1,826 @@
-import React, { useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import { ArrowRight, BrainCircuit, Check, FileText, FlaskConical, Mic, RotateCcw, UserRound, Clock3, ShieldAlert, Send, BarChart3 } from 'lucide-react';
-import { generateProfessorProfile } from './profile';
-import { decideInterruption } from './controller';
-import { calculateRecoveryScore } from './scoring';
-import { analyzeEvidence } from './feedback';
-import './styles.css';
+import React, { useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  ArrowRight,
+  BrainCircuit,
+  Check,
+  FileText,
+  FlaskConical,
+  Mic,
+  RotateCcw,
+  UserRound,
+  Clock3,
+  ShieldAlert,
+  Send,
+  BarChart3,
+} from "lucide-react";
+import { generateProfessorProfile } from "./profile";
+import { decideInterruption } from "./controller";
+import { calculateRecoveryScore } from "./scoring";
+import { analyzeEvidence } from "./feedback";
+import "./styles.css";
 
-const initial = { candidateMaterials: '', presentation: '', professorName: '', affiliation: '', researchDirection: '', homepage: '', papers: '', duration: 5, interruptionMode: 'kind' };
+const initial = {
+  candidateMaterials: "",
+  presentation: "",
+  professorName: "",
+  affiliation: "",
+  researchDirection: "",
+  homepage: "",
+  papers: "",
+  duration: 5,
+  interruptionMode: "kind",
+};
 
 function App() {
-  const [form, setForm] = useState(() => JSON.parse(sessionStorage.getItem('aiic-setup') || 'null') || initial);
-  const [profile, setProfile] = useState(() => JSON.parse(sessionStorage.getItem('aiic-profile') || 'null'));
-  const [stage, setStage] = useState(profile ? 'profile' : 'setup');
+  const [form, setForm] = useState(
+    () => JSON.parse(sessionStorage.getItem("aiic-setup") || "null") || initial,
+  );
+  const [profile, setProfile] = useState(() =>
+    JSON.parse(sessionStorage.getItem("aiic-profile") || "null"),
+  );
+  const [stage, setStage] = useState(profile ? "profile" : "setup");
   const [seconds, setSeconds] = useState(Number(form.duration) * 60);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState("");
   const [segments, setSegments] = useState([]);
   const [interruption, setInterruption] = useState(null);
   const [interruptions, setInterruptions] = useState([]);
   const [qaIndex, setQaIndex] = useState(0);
-  const [qaAnswer, setQaAnswer] = useState('');
+  const [qaAnswer, setQaAnswer] = useState("");
   const [qaLog, setQaLog] = useState([]);
   const [report, setReport] = useState(null);
-  const [voiceStatus, setVoiceStatus] = useState('idle');
-  const [error, setError] = useState('');
-  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const [voiceStatus, setVoiceStatus] = useState("idle");
+  const [error, setError] = useState("");
+  const update = (key) => (event) =>
+    setForm((current) => ({ ...current, [key]: event.target.value }));
   const generate = (event) => {
     event.preventDefault();
-    if (!form.candidateMaterials.trim() || !form.professorName.trim() || !form.researchDirection.trim()) {
-      setError('请至少填写候选人材料、教授姓名和研究方向。'); return;
+    if (
+      !form.candidateMaterials.trim() ||
+      !form.professorName.trim() ||
+      !form.researchDirection.trim()
+    ) {
+      setError("请至少填写候选人材料、教授姓名和研究方向。");
+      return;
     }
     const next = generateProfessorProfile(form);
-    setProfile(next); setStage('profile'); setError(''); sessionStorage.setItem('aiic-setup', JSON.stringify(form)); sessionStorage.setItem('aiic-profile', JSON.stringify(next));
+    setProfile(next);
+    setStage("profile");
+    setError("");
+    sessionStorage.setItem("aiic-setup", JSON.stringify(form));
+    sessionStorage.setItem("aiic-profile", JSON.stringify(next));
   };
-  const fillDemo = () => setForm({ ...initial, candidateMaterials: '我在课程项目中实现了面向校园规章问答的检索增强系统，负责 agent 路由、离线评测和错误分析。系统准确率从 61% 提升到 78%，跨章节问题召回率提升 14 个百分点。', presentation: '我的陈述分为研究动机、系统设计、实验结果和未来计划。', professorName: '王教授（测试画像）', affiliation: '清华大学 · 智能系统与可信学习实验室', researchDirection: '多智能体系统、强化学习、语言模型工具调用、可信 AI', homepage: '关注复杂环境中的智能体协作与决策，面试风格直接，重视个人贡献和可验证证据。', papers: 'Coordinating Language Agents under Limited Compute', duration: 5, interruptionMode: 'kind' });
-  React.useEffect(() => { if (stage !== 'presenting') return; const id = setInterval(() => { setElapsedSeconds((value) => value + 1); setSeconds((value) => value - 1); }, 1000); return () => clearInterval(id); }, [stage]);
-  const startPresentation = () => { setSeconds(Number(form.duration) * 60); setElapsedSeconds(0); setSegments([]); setTranscript(''); setInterruption(null); setStage('presenting'); };
+  const fillDemo = () =>
+    setForm({
+      ...initial,
+      candidateMaterials:
+        "我在课程项目中实现了面向校园规章问答的检索增强系统，负责 agent 路由、离线评测和错误分析。系统准确率从 61% 提升到 78%，跨章节问题召回率提升 14 个百分点。",
+      presentation: "我的陈述分为研究动机、系统设计、实验结果和未来计划。",
+      professorName: "王教授（测试画像）",
+      affiliation: "清华大学 · 智能系统与可信学习实验室",
+      researchDirection: "多智能体系统、强化学习、语言模型工具调用、可信 AI",
+      homepage:
+        "关注复杂环境中的智能体协作与决策，面试风格直接，重视个人贡献和可验证证据。",
+      papers: "Coordinating Language Agents under Limited Compute",
+      duration: 5,
+      interruptionMode: "kind",
+    });
+  React.useEffect(() => {
+    if (stage !== "presenting") return;
+    const id = setInterval(() => {
+      setElapsedSeconds((value) => value + 1);
+      setSeconds((value) => value - 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [stage]);
+  const startPresentation = () => {
+    setSeconds(Number(form.duration) * 60);
+    setElapsedSeconds(0);
+    setSegments([]);
+    setTranscript("");
+    setInterruption(null);
+    setStage("presenting");
+  };
   const submitSegment = () => {
-    const text = transcript.trim(); if (!text) return;
-    const lower = text.toLowerCase(); const topic = profile.agenda[Math.min(segments.length, profile.agenda.length - 1)];
-    const decision = decideInterruption({ text, interests: profile.professor_profile.research_interests, secondsLeft: seconds, totalSeconds: Number(form.duration) * 60, segmentCount: segments.length, maxFollowups: topic?.max_followups, mode: form.interruptionMode, interruptionCount: interruptions.length, lastInterruptionAt: interruptions.at(-1)?.at ?? null });
-    const reason = decision.reason; const question = decision.question;
-    const entry = { text, at: seconds, speaker: 'candidate' }; setSegments((s) => [...s, entry]); setTranscript('');
-    if (reason) { const item = { reason, question, at: seconds }; setInterruption(item); setInterruptions((s) => [...s, item]); setStage('interrupted'); }
+    const text = transcript.trim();
+    if (!text) return;
+    const lower = text.toLowerCase();
+    const topic =
+      profile.agenda[Math.min(segments.length, profile.agenda.length - 1)];
+    const decision = decideInterruption({
+      text,
+      interests: profile.professor_profile.research_interests,
+      secondsLeft: seconds,
+      totalSeconds: Number(form.duration) * 60,
+      segmentCount: segments.length,
+      maxFollowups: topic?.max_followups,
+      mode: form.interruptionMode,
+      interruptionCount: interruptions.length,
+      lastInterruptionAt: interruptions.at(-1)?.at ?? null,
+    });
+    const reason = decision.reason;
+    const question = decision.question;
+    const entry = { text, at: seconds, speaker: "candidate" };
+    setSegments((s) => [...s, entry]);
+    setTranscript("");
+    if (reason) {
+      const item = { reason, question, at: seconds };
+      setInterruption(item);
+      setInterruptions((s) => [...s, item]);
+      setStage("interrupted");
+    }
   };
-  const answerInterruption = (e) => { e.preventDefault(); if (!qaAnswer.trim()) return; setSegments((s) => [...s, { text: qaAnswer.trim(), at: seconds, speaker: 'candidate', interruption: true }]); setQaAnswer(''); setInterruption(null); setStage('presenting'); };
-  const endPresentation = () => { setStage('qa'); setQaIndex(0); };
-  const currentQuestion = profile?.agenda?.[qaIndex]?.questions?.[qaLog.filter((x) => x.topic === profile?.agenda?.[qaIndex]?.topic).length || 0] || profile?.agenda?.[qaIndex]?.questions?.[0] || '你希望在研究生阶段继续探索什么问题？';
-  const submitAnswer = (e) => { e.preventDefault(); if (!qaAnswer.trim()) return; const nextLog = [...qaLog, { topic: profile.agenda[qaIndex].topic, question: currentQuestion, answer: qaAnswer.trim() }]; setQaLog(nextLog); setQaAnswer(''); if (qaIndex + 1 >= Math.min(3, profile.agenda.length)) { const elapsed = Number(form.duration) * 60 - seconds; const resumeDelay = interruptions.length * 6; const score = calculateRecoveryScore({ interruptionCount: interruptions.length, resumeDelay, elapsedSeconds: elapsed, totalSeconds: Number(form.duration) * 60 }); const next = { recovery: score, interruptionCount: interruptions.length, interruptionDuration: interruptions.length * 12, resumeDelay, qaLog: nextLog, evidence: analyzeEvidence(segments, nextLog), duration: elapsed }; setReport(next); sessionStorage.setItem('aiic-report', JSON.stringify(next)); setStage('report'); } else setQaIndex((i) => i + 1); };
-  const reset = () => { setStage('setup'); setProfile(null); setReport(null); setForm(initial); sessionStorage.clear(); };
-  const clock = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
-  if (stage === 'presenting' || stage === 'interrupted') return <Presentation elapsed={clock} overLimit={elapsedSeconds >= Number(form.duration) * 60} nearLimit={elapsedSeconds >= Number(form.duration) * 60 - 30 && elapsedSeconds < Number(form.duration) * 60} profile={profile} segments={segments} interruption={interruption} transcript={transcript} setTranscript={setTranscript} submitSegment={submitSegment} qaAnswer={qaAnswer} setQaAnswer={setQaAnswer} answerInterruption={answerInterruption} endPresentation={endPresentation} voiceStatus={voiceStatus} setVoiceStatus={setVoiceStatus} />;
-  if (stage === 'qa') return <QA profile={profile} index={qaIndex} question={currentQuestion} answer={qaAnswer} setAnswer={setQaAnswer} submit={submitAnswer} />;
-  if (stage === 'report') return <Report profile={profile} report={report} reset={reset} />;
-  return <main className="shell">
-    <header className="topbar"><div className="brand"><BrainCircuit size={20}/> <span>ORAL EXAM / AIIC</span></div><span className="step">MVP · SETUP</span></header>
-    <section className="intro"><p className="eyebrow">PROFESSOR INTERVIEW SIMULATOR</p><h1>准备一场真正的导师复试。</h1><p className="sub">提供你的材料，指定目标教授，开始一场会主动追问和控制节奏的模拟面试。</p></section>
-    <div className="setup-progress"><span className="active"><b>01</b>你的材料</span><i/><span><b>02</b>目标教授</span><i/><span><b>03</b>面试策略</span></div>
-    <div className="workspace">
-      <form className="setup panel" onSubmit={generate}>
-        <div className="panel-title"><span>01</span><div><h2>你的材料</h2><p>教授会从你的真实经历中找到追问入口。</p></div><button type="button" className="demo-fill" onClick={fillDemo}>使用演示材料</button></div>
-        <label><span><FileText size={15}/> 简历 / 科研经历 <em>必填</em></span><textarea className="primary-input" value={form.candidateMaterials} onChange={update('candidateMaterials')} placeholder="粘贴简历、科研项目或自我介绍文本…" rows="8" /></label>
-        <label><span><FileText size={15}/> PPT / 个人陈述 <small>可选</small></span><textarea value={form.presentation} onChange={update('presentation')} placeholder="粘贴你的复试 PPT 讲稿或个人陈述…" rows="3" /></label>
-        <div className="section-rule" />
-        <div className="panel-title compact"><span>02</span><div><h2>目标教授</h2><p>画像只服务于这一位教授。</p></div></div>
-        <div className="grid"><label><span><UserRound size={15}/> 教授姓名 <em>必填</em></span><input value={form.professorName} onChange={update('professorName')} placeholder="例如：王教授" /></label><label><span><FlaskConical size={15}/> 学校 / 实验室</span><input value={form.affiliation} onChange={update('affiliation')} placeholder="例如：北京大学 · AI Lab" /></label></div>
-        <label><span>研究方向 <em>必填</em></span><input value={form.researchDirection} onChange={update('researchDirection')} placeholder="例如：多智能体系统、强化学习" /></label>
-        <details className="optional-details"><summary>补充教授信息 <small>主页介绍 / 代表论文</small></summary><label><span>教授主页 / 个人介绍</span><textarea value={form.homepage} onChange={update('homepage')} placeholder="粘贴教授主页或个人介绍…" rows="3" /></label><label><span>代表论文</span><input value={form.papers} onChange={update('papers')} placeholder="论文标题，用逗号分隔" /></label></details>
-        <div className="strategy-head"><span>03</span><div><h2>面试策略</h2><p>选择教授介入陈述的强度。</p></div></div><div className="mode-cards">{[['none','静默观察','不主动打断，先专注完成陈述'],['kind','标准追问','只在关键研究点介入，约 2 次'],['pressure','高压追问','更积极挑战方法与证据，最多 4 次']].map(([value,title,desc]) => <button type="button" key={value} className={form.interruptionMode === value ? 'mode-card selected' : 'mode-card'} onClick={() => setForm((current) => ({ ...current, interruptionMode: value }))}><strong>{title}</strong><span>{desc}</span></button>)}</div>
-        <div className="duration"><label><span>陈述建议时长</span><select value={form.duration} onChange={update('duration')}><option value="5">5 分钟</option><option value="3">3 分钟</option><option value="8">8 分钟</option></select></label><button type="submit">生成模拟教授 <ArrowRight size={17}/></button></div>
-        {error && <p className="error">{error}</p>}
-      </form>
-      <aside className="profile panel">{profile ? <><div className="profile-head"><div className="avatar">{profile.professor_profile.name.slice(0, 1)}</div><div><p className="eyebrow">SIMULATED PROFESSOR</p><h2>{profile.professor_profile.name}</h2><p>{profile.professor_profile.affiliation}</p></div><span className="ready"><Check size={14}/> READY</span></div><div className="profile-block"><h3>研究兴趣</h3><div className="chips">{profile.professor_profile.research_interests.map((x) => <span key={x}>{x}</span>)}</div></div><div className="profile-block"><h3>可能重点关注</h3><ul>{profile.professor_profile.focus.map((x) => <li key={x}>{x}</li>)}</ul></div><div className="profile-block"><h3>交叉点 / 可能追问</h3>{profile.intersections.map((x) => <p className="cross" key={x}>{x}</p>)}</div><div className="profile-note"><span>教授风格</span><p>{profile.professor_profile.style}</p></div><button className="primary-wide" onClick={startPresentation}><Mic size={16}/> Start {form.duration}-minute presentation <ArrowRight size={16}/></button><button className="secondary" onClick={() => { setProfile(null); setStage('setup'); sessionStorage.removeItem('aiic-profile'); }}><RotateCcw size={15}/> Edit setup</button></> : <div className="empty"><BrainCircuit size={30}/><h2>Your professor is waiting.</h2><p>完成左侧 setup 后，这里会生成一位有研究 agenda 的模拟教授。</p></div>}</aside>
-    </div>
-  </main>;
+  const answerInterruption = (e) => {
+    e.preventDefault();
+    if (!qaAnswer.trim()) return;
+    setSegments((s) => [
+      ...s,
+      {
+        text: qaAnswer.trim(),
+        at: seconds,
+        speaker: "candidate",
+        interruption: true,
+      },
+    ]);
+    setQaAnswer("");
+    setInterruption(null);
+    setStage("presenting");
+  };
+  const endPresentation = () => {
+    setStage("qa");
+    setQaIndex(0);
+  };
+  const currentQuestion =
+    profile?.agenda?.[qaIndex]?.questions?.[
+      qaLog.filter((x) => x.topic === profile?.agenda?.[qaIndex]?.topic)
+        .length || 0
+    ] ||
+    profile?.agenda?.[qaIndex]?.questions?.[0] ||
+    "你希望在研究生阶段继续探索什么问题？";
+  const submitAnswer = (e) => {
+    e.preventDefault();
+    if (!qaAnswer.trim()) return;
+    const nextLog = [
+      ...qaLog,
+      {
+        topic: profile.agenda[qaIndex].topic,
+        question: currentQuestion,
+        answer: qaAnswer.trim(),
+      },
+    ];
+    setQaLog(nextLog);
+    setQaAnswer("");
+    if (qaIndex + 1 >= Math.min(3, profile.agenda.length)) {
+      const elapsed = Number(form.duration) * 60 - seconds;
+      const resumeDelay = interruptions.length * 6;
+      const score = calculateRecoveryScore({
+        interruptionCount: interruptions.length,
+        resumeDelay,
+        elapsedSeconds: elapsed,
+        totalSeconds: Number(form.duration) * 60,
+      });
+      const next = {
+        recovery: score,
+        interruptionCount: interruptions.length,
+        interruptionDuration: interruptions.length * 12,
+        resumeDelay,
+        qaLog: nextLog,
+        evidence: analyzeEvidence(segments, nextLog),
+        duration: elapsed,
+      };
+      setReport(next);
+      sessionStorage.setItem("aiic-report", JSON.stringify(next));
+      setStage("report");
+    } else setQaIndex((i) => i + 1);
+  };
+  const reset = () => {
+    setStage("setup");
+    setProfile(null);
+    setReport(null);
+    setForm(initial);
+    sessionStorage.clear();
+  };
+  const clock = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+  if (stage === "presenting" || stage === "interrupted")
+    return (
+      <Presentation
+        elapsed={clock}
+        overLimit={elapsedSeconds >= Number(form.duration) * 60}
+        nearLimit={
+          elapsedSeconds >= Number(form.duration) * 60 - 30 &&
+          elapsedSeconds < Number(form.duration) * 60
+        }
+        profile={profile}
+        segments={segments}
+        interruption={interruption}
+        transcript={transcript}
+        setTranscript={setTranscript}
+        submitSegment={submitSegment}
+        qaAnswer={qaAnswer}
+        setQaAnswer={setQaAnswer}
+        answerInterruption={answerInterruption}
+        endPresentation={endPresentation}
+        voiceStatus={voiceStatus}
+        setVoiceStatus={setVoiceStatus}
+      />
+    );
+  if (stage === "qa")
+    return (
+      <QA
+        profile={profile}
+        index={qaIndex}
+        question={currentQuestion}
+        answer={qaAnswer}
+        setAnswer={setQaAnswer}
+        submit={submitAnswer}
+      />
+    );
+  if (stage === "report")
+    return <Report profile={profile} report={report} reset={reset} />;
+  return (
+    <main className="shell">
+      <header className="topbar">
+        <div className="brand">
+          <BrainCircuit size={20} /> <span>ORAL EXAM / AIIC</span>
+        </div>
+        <span className="step">MVP · SETUP</span>
+      </header>
+      <section className="intro">
+        <p className="eyebrow">PROFESSOR INTERVIEW SIMULATOR</p>
+        <h1>准备一场真正的导师复试。</h1>
+        <p className="sub">
+          提供你的材料，指定目标教授，开始一场会主动追问和控制节奏的模拟面试。
+        </p>
+      </section>
+      <div className="setup-progress">
+        <span className="active">
+          <b>01</b>你的材料
+        </span>
+        <i />
+        <span>
+          <b>02</b>目标教授
+        </span>
+        <i />
+        <span>
+          <b>03</b>面试策略
+        </span>
+      </div>
+      <div className="workspace">
+        <form className="setup panel" onSubmit={generate}>
+          <div className="panel-title">
+            <span>01</span>
+            <div>
+              <h2>你的材料</h2>
+              <p>教授会从你的真实经历中找到追问入口。</p>
+            </div>
+            <button type="button" className="demo-fill" onClick={fillDemo}>
+              使用演示材料
+            </button>
+          </div>
+          <label>
+            <span>
+              <FileText size={15} /> 简历 / 科研经历 <em>必填</em>
+            </span>
+            <textarea
+              className="primary-input"
+              value={form.candidateMaterials}
+              onChange={update("candidateMaterials")}
+              placeholder="粘贴简历、科研项目或自我介绍文本…"
+              rows="8"
+            />
+          </label>
+          <label>
+            <span>
+              <FileText size={15} /> PPT / 个人陈述 <small>可选</small>
+            </span>
+            <textarea
+              value={form.presentation}
+              onChange={update("presentation")}
+              placeholder="粘贴你的复试 PPT 讲稿或个人陈述…"
+              rows="3"
+            />
+          </label>
+          <div className="section-rule" />
+          <div className="panel-title compact">
+            <span>02</span>
+            <div>
+              <h2>目标教授</h2>
+              <p>画像只服务于这一位教授。</p>
+            </div>
+          </div>
+          <div className="grid">
+            <label>
+              <span>
+                <UserRound size={15} /> 教授姓名 <em>必填</em>
+              </span>
+              <input
+                value={form.professorName}
+                onChange={update("professorName")}
+                placeholder="例如：王教授"
+              />
+            </label>
+            <label>
+              <span>
+                <FlaskConical size={15} /> 学校 / 实验室
+              </span>
+              <input
+                value={form.affiliation}
+                onChange={update("affiliation")}
+                placeholder="例如：北京大学 · AI Lab"
+              />
+            </label>
+          </div>
+          <label>
+            <span>
+              研究方向 <em>必填</em>
+            </span>
+            <input
+              value={form.researchDirection}
+              onChange={update("researchDirection")}
+              placeholder="例如：多智能体系统、强化学习"
+            />
+          </label>
+          <details className="optional-details">
+            <summary>
+              补充教授信息 <small>主页介绍 / 代表论文</small>
+            </summary>
+            <label>
+              <span>教授主页 / 个人介绍</span>
+              <textarea
+                value={form.homepage}
+                onChange={update("homepage")}
+                placeholder="粘贴教授主页或个人介绍…"
+                rows="3"
+              />
+            </label>
+            <label>
+              <span>代表论文</span>
+              <input
+                value={form.papers}
+                onChange={update("papers")}
+                placeholder="论文标题，用逗号分隔"
+              />
+            </label>
+          </details>
+          <div className="strategy-head">
+            <span>03</span>
+            <div>
+              <h2>面试策略</h2>
+              <p>选择教授介入陈述的强度。</p>
+            </div>
+          </div>
+          <div className="mode-cards">
+            {[
+              ["none", "静默观察", "不主动打断，先专注完成陈述"],
+              ["kind", "标准追问", "只在关键研究点介入，约 2 次"],
+              ["pressure", "高压追问", "更积极挑战方法与证据，最多 4 次"],
+            ].map(([value, title, desc]) => (
+              <button
+                type="button"
+                key={value}
+                className={
+                  form.interruptionMode === value
+                    ? "mode-card selected"
+                    : "mode-card"
+                }
+                onClick={() =>
+                  setForm((current) => ({
+                    ...current,
+                    interruptionMode: value,
+                  }))
+                }
+              >
+                <strong>{title}</strong>
+                <span>{desc}</span>
+              </button>
+            ))}
+          </div>
+          <div className="duration">
+            <label>
+              <span>陈述建议时长</span>
+              <select value={form.duration} onChange={update("duration")}>
+                <option value="5">5 分钟</option>
+                <option value="3">3 分钟</option>
+                <option value="8">8 分钟</option>
+              </select>
+            </label>
+            <button type="submit">
+              生成模拟教授 <ArrowRight size={17} />
+            </button>
+          </div>
+          {error && <p className="error">{error}</p>}
+        </form>
+        <aside className="profile panel">
+          {profile ? (
+            <>
+              <div className="profile-head">
+                <div className="avatar">
+                  {profile.professor_profile.name.slice(0, 1)}
+                </div>
+                <div>
+                  <p className="eyebrow">SIMULATED PROFESSOR</p>
+                  <h2>{profile.professor_profile.name}</h2>
+                  <p>{profile.professor_profile.affiliation}</p>
+                </div>
+                <span className="ready">
+                  <Check size={14} /> READY
+                </span>
+              </div>
+              <div className="profile-block">
+                <h3>研究兴趣</h3>
+                <div className="chips">
+                  {profile.professor_profile.research_interests.map((x) => (
+                    <span key={x}>{x}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="profile-block">
+                <h3>可能重点关注</h3>
+                <ul>
+                  {profile.professor_profile.focus.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="profile-block">
+                <h3>交叉点 / 可能追问</h3>
+                {profile.intersections.map((x) => (
+                  <p className="cross" key={x}>
+                    {x}
+                  </p>
+                ))}
+              </div>
+              <div className="profile-note">
+                <span>教授风格</span>
+                <p>{profile.professor_profile.style}</p>
+              </div>
+              <button className="primary-wide" onClick={startPresentation}>
+                <Mic size={16} /> Start {form.duration}-minute presentation{" "}
+                <ArrowRight size={16} />
+              </button>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setProfile(null);
+                  setStage("setup");
+                  sessionStorage.removeItem("aiic-profile");
+                }}
+              >
+                <RotateCcw size={15} /> Edit setup
+              </button>
+            </>
+          ) : (
+            <div className="empty">
+              <BrainCircuit size={30} />
+              <h2>Your professor is waiting.</h2>
+              <p>完成左侧 setup 后，这里会生成一位有研究 agenda 的模拟教授。</p>
+            </div>
+          )}
+        </aside>
+      </div>
+    </main>
+  );
 }
-function Presentation({ elapsed, overLimit, nearLimit, profile, segments, interruption, transcript, setTranscript, submitSegment, qaAnswer, setQaAnswer, answerInterruption, endPresentation, voiceStatus, setVoiceStatus }) { const listen = () => { const API = window.SpeechRecognition || window.webkitSpeechRecognition; if (!API) { setVoiceStatus('unsupported'); return; } const recognition = new API(); recognition.lang = 'zh-CN'; recognition.interimResults = false; recognition.onstart = () => setVoiceStatus('listening'); recognition.onerror = () => setVoiceStatus('error'); recognition.onend = () => setVoiceStatus('idle'); recognition.onresult = (e) => setTranscript((v) => `${v} ${e.results[0][0].transcript}`.trim()); recognition.start(); }; return <main className="sim-shell"><header className="sim-top"><div className="brand"><BrainCircuit size={20}/> ORAL EXAM / AIIC</div><span className="live"><span/> LIVE SIMULATION</span></header><section className="sim-hero"><p className="eyebrow">PRESENTATION SIMULATION</p><div className="sim-meta"><div><div className="avatar large">{profile.professor_profile.name.slice(0,1)}</div><h1>{profile.professor_profile.name}</h1><p>{profile.professor_profile.affiliation}</p></div><div className={overLimit ? 'elapsed overtime':'elapsed'}><Clock3 size={17}/><strong>{elapsed}</strong><span>{overLimit ? 'over recommended limit' : 'elapsed'}</span></div></div>{nearLimit && <div className="time-notice">还剩约 30 秒，建议总结核心贡献并准备收尾。</div>}{overLimit && <div className="time-notice overtime-notice">已超过建议时长，你可以继续完成陈述；实际用时会记录在报告中。</div>}</section><div className="sim-grid"><section className="transcript panel"><div className="sim-label"><span>CANDIDATE TRANSCRIPT</span><small>{segments.length} segments</small></div>{segments.length ? segments.map((s,i)=><div className={s.interruption ? 'utterance marked':'utterance'} key={i}><span>{s.interruption ? 'AFTER INTERRUPTION':'YOU'}</span><p>{s.text}</p></div>) : <div className="transcript-empty">开始讲述你的个人陈述。每 10–20 秒提交一个自然语义段。</div>}<textarea value={transcript} onChange={(e)=>setTranscript(e.target.value)} placeholder="输入你正在讲的这一段…" rows="4" /><div className="input-actions"><span><ShieldAlert size={14}/> Controller 会检查内容并决定是否打断</span><span className="input-buttons"><button className="voice" onClick={listen}><Mic size={15}/> {voiceStatus === 'listening' ? 'Listening…' : 'Voice'}</button><button onClick={submitSegment}><Send size={15}/> Submit segment</button></span></div>{voiceStatus === 'unsupported' && <p className="voice-hint">当前浏览器不支持语音识别，请继续使用文字输入。</p>}{voiceStatus === 'error' && <p className="voice-hint">麦克风或语音权限不可用，文字输入仍可继续。</p>}<button className="finish" onClick={endPresentation}>Finish presentation <ArrowRight size={15}/></button></section><aside className={interruption ? 'interrupt panel active':'interrupt panel'}><div className="sim-label"><span>PROFESSOR INTERRUPTION</span><small>{interruption ? interruption.reason : 'LISTENING'}</small></div>{interruption ? <><div className="quote">“{interruption.question}”</div><p className="interrupt-note">计时没有暂停。回答后，你需要自己决定从哪里继续。</p><form onSubmit={answerInterruption}><textarea value={qaAnswer} onChange={(e)=>setQaAnswer(e.target.value)} placeholder="用文字回答教授…" rows="5" /><button><Send size={15}/> Answer & resume</button></form></> : <div className="listening"><span className="pulse"/><strong>Candidate is presenting…</strong><p>教授会根据研究兴趣、证据密度和时间主动介入。</p></div>}</aside></div></main> }
-function QA({ profile, index, question, answer, setAnswer, submit }) { return <main className="qa-shell"><header className="topbar"><div className="brand"><BrainCircuit size={20}/> ORAL EXAM / AIIC</div><span className="step">FORMAL INTERVIEW · {index + 1}/3</span></header><div className="qa-wrap"><p className="eyebrow">PROFESSOR INTERVIEW</p><h1>现在，聊聊你的研究。</h1><div className="qa-card panel"><div className="profile-head"><div className="avatar">{profile.professor_profile.name.slice(0,1)}</div><div><h2>{profile.professor_profile.name}</h2><p>{profile.professor_profile.affiliation}</p></div></div><div className="question">{question}</div><form onSubmit={submit}><textarea value={answer} onChange={(e)=>setAnswer(e.target.value)} placeholder="用 1–2 分钟回答，教授会控制追问节奏…" rows="7" /><button>Submit answer <ArrowRight size={16}/></button></form></div></div></main> }
-function Report({ profile, report, reset }) { return <main className="report-shell"><header className="topbar"><div className="brand"><BrainCircuit size={20}/> ORAL EXAM / AIIC</div><span className="step">SESSION REPORT</span></header><div className="report-wrap"><p className="eyebrow">POST-INTERVIEW DEBRIEF</p><h1>这位教授听到了什么？</h1><p className="sub">{profile.professor_profile.name} · {profile.professor_profile.affiliation}</p><div className="score-grid"><div className="score panel"><span>INTERRUPTION RECOVERY</span><strong>{report.recovery}<small>/100</small></strong><p>{report.interruptionCount ? `你被打断 ${report.interruptionCount} 次。每次打断后都重新获得了发言权。` : '本轮没有触发打断，保持了稳定节奏。'}</p></div><div className="metric panel"><BarChart3 size={18}/><strong>{report.duration}s</strong><span>presentation time recorded</span></div><div className="metric panel"><ShieldAlert size={18}/><strong>{report.interruptionCount}</strong><span>professor interruptions</span></div></div><section className="evidence panel"><h2>逐条证据反馈</h2>{report.evidence?.length ? report.evidence.map((item,index) => <div className="finding" key={`${item.tag}-${index}`}><div className="finding-top"><b>{String(index+1).padStart(2,'0')}</b><span>{item.tag}</span></div><blockquote>“{item.quote}”</blockquote><p><strong>问题：</strong>{item.issue}</p><p><strong>建议：</strong>{item.advice}</p></div>) : <p className="no-findings">本轮没有检测到明显的证据缺口，继续保持具体、可验证的表达。</p>}<h2>下一轮要练什么</h2><div className="advice"><b>01</b><p>被追问时先承认范围，再给结论：不要从背景重新开始。</p></div><div className="advice"><b>02</b><p>把“明显提升”“参与项目”替换成数字和明确的个人负责边界。</p></div><div className="advice"><b>03</b><p>教授已经覆盖一个 topic 后，主动用一句话切到下一个核心贡献。</p></div></section><button className="primary-wide" onClick={reset}><RotateCcw size={16}/> Start another round</button></div></main> }
-createRoot(document.getElementById('root')).render(<App />);
+function Presentation({
+  elapsed,
+  overLimit,
+  nearLimit,
+  profile,
+  segments,
+  interruption,
+  transcript,
+  setTranscript,
+  submitSegment,
+  qaAnswer,
+  setQaAnswer,
+  answerInterruption,
+  endPresentation,
+  voiceStatus,
+  setVoiceStatus,
+}) {
+  return (
+    <main className="sim-shell">
+      <header className="sim-top">
+        <div className="brand">
+          <BrainCircuit size={20} /> ORAL EXAM / AIIC
+        </div>
+        <span className="live">
+          <span /> LIVE SIMULATION
+        </span>
+      </header>
+      <section className="sim-hero">
+        <p className="eyebrow">PRESENTATION SIMULATION</p>
+        <div className="sim-meta">
+          <div>
+            <div className="avatar large">
+              {profile.professor_profile.name.slice(0, 1)}
+            </div>
+            <h1>{profile.professor_profile.name}</h1>
+            <p>{profile.professor_profile.affiliation}</p>
+          </div>
+          <div className={overLimit ? "elapsed overtime" : "elapsed"}>
+            <Clock3 size={17} />
+            <strong>{elapsed}</strong>
+            <span>{overLimit ? "over recommended limit" : "elapsed"}</span>
+          </div>
+        </div>
+        {nearLimit && (
+          <div className="time-notice">
+            还剩约 30 秒，建议总结核心贡献并准备收尾。
+          </div>
+        )}
+        {overLimit && (
+          <div className="time-notice overtime-notice">
+            已超过建议时长，你可以继续完成陈述；实际用时会记录在报告中。
+          </div>
+        )}
+      </section>
+      <div className="sim-grid">
+        <section className="transcript panel">
+          <div className="sim-label">
+            <span>CANDIDATE TRANSCRIPT</span>
+            <small>{segments.length} segments</small>
+          </div>
+          {segments.length ? (
+            segments.map((s, i) => (
+              <div
+                className={s.interruption ? "utterance marked" : "utterance"}
+                key={i}
+              >
+                <span>{s.interruption ? "AFTER INTERRUPTION" : "YOU"}</span>
+                <p>{s.text}</p>
+              </div>
+            ))
+          ) : (
+            <div className="transcript-empty">
+              开始讲述你的个人陈述。每 10–20 秒提交一个自然语义段。
+            </div>
+          )}
+          <textarea
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            placeholder="输入你正在讲的这一段…"
+            rows="4"
+          />
+          <div className="input-actions">
+            <span>
+              <ShieldAlert size={14} /> Controller 会检查内容并决定是否打断
+            </span>
+            <span className="input-buttons">
+              <VoiceButton voiceStatus={voiceStatus} setVoiceStatus={setVoiceStatus} setTranscript={setTranscript} />
+              <button onClick={submitSegment}>
+                <Send size={15} /> Submit segment
+              </button>
+            </span>
+          </div>
+          {voiceStatus === "unsupported" && (
+            <p className="voice-hint">
+              当前浏览器不支持语音识别，请继续使用文字输入。
+            </p>
+          )}
+          {voiceStatus === "error" && (
+            <p className="voice-hint">
+              麦克风或语音权限不可用，文字输入仍可继续。
+            </p>
+          )}
+          {voiceStatus === "secure-required" && (
+            <p className="voice-hint">语音输入需要 HTTPS 安全连接，请使用 https 地址并允许麦克风权限。</p>
+          )}
+          <button className="finish" onClick={endPresentation}>
+            Finish presentation <ArrowRight size={15} />
+          </button>
+        </section>
+        <aside
+          className={
+            interruption ? "interrupt panel active" : "interrupt panel"
+          }
+        >
+          <div className="sim-label">
+            <span>PROFESSOR INTERRUPTION</span>
+            <small>{interruption ? interruption.reason : "LISTENING"}</small>
+          </div>
+          {interruption ? (
+            <>
+              <div className="quote">“{interruption.question}”</div>
+              <p className="interrupt-note">
+                计时没有暂停。回答后，你需要自己决定从哪里继续。
+              </p>
+              <form onSubmit={answerInterruption}>
+                <textarea
+                  value={qaAnswer}
+                  onChange={(e) => setQaAnswer(e.target.value)}
+                  placeholder="用文字回答教授…"
+                  rows="5"
+                />
+                <button>
+                  <Send size={15} /> Answer & resume
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="listening">
+              <span className="pulse" />
+              <strong>Candidate is presenting…</strong>
+              <p>教授会根据研究兴趣、证据密度和时间主动介入。</p>
+            </div>
+          )}
+        </aside>
+      </div>
+    </main>
+  );
+}
+function QA({ profile, index, question, answer, setAnswer, submit }) {
+  return (
+    <main className="qa-shell">
+      <header className="topbar">
+        <div className="brand">
+          <BrainCircuit size={20} /> ORAL EXAM / AIIC
+        </div>
+        <span className="step">FORMAL INTERVIEW · {index + 1}/3</span>
+      </header>
+      <div className="qa-wrap">
+        <p className="eyebrow">PROFESSOR INTERVIEW</p>
+        <h1>现在，聊聊你的研究。</h1>
+        <div className="qa-card panel">
+          <div className="profile-head">
+            <div className="avatar">
+              {profile.professor_profile.name.slice(0, 1)}
+            </div>
+            <div>
+              <h2>{profile.professor_profile.name}</h2>
+              <p>{profile.professor_profile.affiliation}</p>
+            </div>
+          </div>
+          <div className="question">{question}</div>
+          <form onSubmit={submit}>
+            <textarea
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="用 1–2 分钟回答，教授会控制追问节奏…"
+              rows="7"
+            />
+            <button>
+              Submit answer <ArrowRight size={16} />
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+  );
+}
+function Report({ profile, report, reset }) {
+  return (
+    <main className="report-shell">
+      <header className="topbar">
+        <div className="brand">
+          <BrainCircuit size={20} /> ORAL EXAM / AIIC
+        </div>
+        <span className="step">SESSION REPORT</span>
+      </header>
+      <div className="report-wrap">
+        <p className="eyebrow">POST-INTERVIEW DEBRIEF</p>
+        <h1>这位教授听到了什么？</h1>
+        <p className="sub">
+          {profile.professor_profile.name} ·{" "}
+          {profile.professor_profile.affiliation}
+        </p>
+        <div className="score-grid">
+          <div className="score panel">
+            <span>INTERRUPTION RECOVERY</span>
+            <strong>
+              {report.recovery}
+              <small>/100</small>
+            </strong>
+            <p>
+              {report.interruptionCount
+                ? `你被打断 ${report.interruptionCount} 次。每次打断后都重新获得了发言权。`
+                : "本轮没有触发打断，保持了稳定节奏。"}
+            </p>
+          </div>
+          <div className="metric panel">
+            <BarChart3 size={18} />
+            <strong>{report.duration}s</strong>
+            <span>presentation time recorded</span>
+          </div>
+          <div className="metric panel">
+            <ShieldAlert size={18} />
+            <strong>{report.interruptionCount}</strong>
+            <span>professor interruptions</span>
+          </div>
+        </div>
+        <section className="evidence panel">
+          <h2>逐条证据反馈</h2>
+          {report.evidence?.length ? (
+            report.evidence.map((item, index) => (
+              <div className="finding" key={`${item.tag}-${index}`}>
+                <div className="finding-top">
+                  <b>{String(index + 1).padStart(2, "0")}</b>
+                  <span>{item.tag}</span>
+                </div>
+                <blockquote>“{item.quote}”</blockquote>
+                <p>
+                  <strong>问题：</strong>
+                  {item.issue}
+                </p>
+                <p>
+                  <strong>建议：</strong>
+                  {item.advice}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="no-findings">
+              本轮没有检测到明显的证据缺口，继续保持具体、可验证的表达。
+            </p>
+          )}
+          <h2>下一轮要练什么</h2>
+          <div className="advice">
+            <b>01</b>
+            <p>被追问时先承认范围，再给结论：不要从背景重新开始。</p>
+          </div>
+          <div className="advice">
+            <b>02</b>
+            <p>把“明显提升”“参与项目”替换成数字和明确的个人负责边界。</p>
+          </div>
+          <div className="advice">
+            <b>03</b>
+            <p>教授已经覆盖一个 topic 后，主动用一句话切到下一个核心贡献。</p>
+          </div>
+        </section>
+        <button className="primary-wide" onClick={reset}>
+          <RotateCcw size={16} /> Start another round
+        </button>
+      </div>
+    </main>
+  );
+}
+function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript }) {
+  const recognitionRef = useRef(null);
+  const activeRef = useRef(false);
+  const toggle = () => {
+    if (!window.isSecureContext) return setVoiceStatus("secure-required");
+    const API = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!API) return setVoiceStatus("unsupported");
+    if (activeRef.current) {
+      activeRef.current = false;
+      recognitionRef.current?.stop();
+      setVoiceStatus("idle");
+      return;
+    }
+    const recognition = new API();
+    recognitionRef.current = recognition;
+    activeRef.current = true;
+    recognition.lang = "zh-CN";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => setVoiceStatus("listening");
+    recognition.onresult = (event) => {
+      let chunk = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1)
+        if (event.results[i].isFinal) chunk += event.results[i][0].transcript;
+      if (chunk) setTranscript((value) => `${value} ${chunk}`.trim());
+    };
+    recognition.onerror = (event) => {
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed"
+      ) {
+        activeRef.current = false;
+        setVoiceStatus("error");
+      } else if (activeRef.current) setVoiceStatus("reconnecting");
+    };
+    recognition.onend = () => {
+      if (!activeRef.current) return setVoiceStatus("idle");
+      setVoiceStatus("reconnecting");
+      window.setTimeout(() => {
+        if (activeRef.current) {
+          try {
+            recognition.start();
+          } catch {
+            /* restart guard */
+          }
+        }
+      }, 250);
+    };
+    try {
+      recognition.start();
+    } catch {
+      activeRef.current = false;
+      setVoiceStatus("error");
+    }
+  };
+  return (
+    <button type="button" className="voice" onClick={toggle}>
+      <Mic size={15} />{" "}
+      {voiceStatus === "listening"
+        ? "Stop voice"
+        : voiceStatus === "reconnecting"
+          ? "Reconnecting…"
+          : "Voice"}
+    </button>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<App />);
