@@ -41,6 +41,7 @@ const initial = {
   papers: "",
   duration: 5,
   interruptionMode: "kind",
+  interviewMode: "presentation-only",
 };
 
 function App() {
@@ -166,15 +167,44 @@ function App() {
     setInterruption(null);
     setStage("presenting");
   };
+  const finishReport = async (answerLog = qaLog) => {
+    const elapsed = Number(form.duration) * 60 - seconds;
+    const resumeDelay = interruptions.length * 6;
+    const score = calculateRecoveryScore({
+      interruptionCount: interruptions.length,
+      resumeDelay,
+      elapsedSeconds: elapsed,
+      totalSeconds: Number(form.duration) * 60,
+    });
+    const fallback = {
+      recovery: score,
+      interruptionCount: interruptions.length,
+      interruptionDuration: interruptions.length * 12,
+      resumeDelay,
+      qaLog: answerLog,
+      evidence: analyzeEvidence(segments, answerLog),
+      duration: elapsed,
+    };
+    setAiBusy(true);
+    const next = await generateReportAI({ profile, segments, qaLog: answerLog, fallback });
+    setAiBusy(false);
+    setReport(next);
+    sessionStorage.setItem("aiic-report", JSON.stringify(next));
+    setStage("report");
+  };
   const endPresentation = async () => {
-    setStage("qa");
-    setQaIndex(0);
-    if (profile && !profile.aiQuestions) {
-      const questions = await generateQuestionsAI(profile);
-      const next = { ...profile, aiQuestions: questions };
-      setProfile(next);
-      sessionStorage.setItem("aiic-profile", JSON.stringify(next));
+    if (form.interviewMode === "deep-qa") {
+      setStage("qa");
+      setQaIndex(0);
+      if (profile && !profile.aiQuestions) {
+        const questions = await generateQuestionsAI(profile);
+        const next = { ...profile, aiQuestions: questions };
+        setProfile(next);
+        sessionStorage.setItem("aiic-profile", JSON.stringify(next));
+      }
+      return;
     }
+    await finishReport([]);
   };
   const currentQuestion =
     profile?.aiQuestions?.[qaIndex] || profile?.agenda?.[qaIndex]?.questions?.[
@@ -197,29 +227,7 @@ function App() {
     setQaLog(nextLog);
     setQaAnswer("");
     if (qaIndex + 1 >= Math.min(3, profile.agenda.length)) {
-      const elapsed = Number(form.duration) * 60 - seconds;
-      const resumeDelay = interruptions.length * 6;
-      const score = calculateRecoveryScore({
-        interruptionCount: interruptions.length,
-        resumeDelay,
-        elapsedSeconds: elapsed,
-        totalSeconds: Number(form.duration) * 60,
-      });
-      const fallback = {
-        recovery: score,
-        interruptionCount: interruptions.length,
-        interruptionDuration: interruptions.length * 12,
-        resumeDelay,
-        qaLog: nextLog,
-        evidence: analyzeEvidence(segments, nextLog),
-        duration: elapsed,
-      };
-      setAiBusy(true);
-      const next = await generateReportAI({ profile, segments, qaLog: nextLog, fallback });
-      setAiBusy(false);
-      setReport(next);
-      sessionStorage.setItem("aiic-report", JSON.stringify(next));
-      setStage("report");
+      await finishReport(nextLog);
     } else setQaIndex((i) => i + 1);
   };
   const reset = () => {
@@ -423,6 +431,28 @@ function App() {
                 <span>{desc}</span>
               </button>
             ))}
+          </div>
+          <div className="interview-mode">
+            <div className="interview-mode-label">
+              <span>面试环节</span>
+              <small>陈述结束后是否继续正式问答</small>
+            </div>
+            <div className="mode-cards deep-mode-cards">
+              {[
+                ["presentation-only", "陈述评估", "结束陈述后直接生成带证据的反馈报告"],
+                ["deep-qa", "陈述 + 深度问答", "结束陈述后进入最多 3 个结构化教授问题"],
+              ].map(([value, title, desc]) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={form.interviewMode === value ? "mode-card selected" : "mode-card"}
+                  onClick={() => setForm((current) => ({ ...current, interviewMode: value }))}
+                >
+                  <strong>{title}</strong>
+                  <span>{desc}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <div className="duration">
             <label>
