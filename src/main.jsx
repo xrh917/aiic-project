@@ -68,6 +68,7 @@ function App() {
   const [runHistory, setRunHistory] = useState(() => JSON.parse(sessionStorage.getItem("aiic-runs") || "[]"));
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [interruptionVoiceStatus, setInterruptionVoiceStatus] = useState("idle");
+  const [demoExampleIndex, setDemoExampleIndex] = useState(0);
   const [error, setError] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const update = (key) => (event) =>
@@ -127,7 +128,19 @@ function App() {
     setInterruptions([]);
     setQaAnswer("");
     setQaLog([]);
+    setDemoExampleIndex(0);
     setStage("presenting");
+  };
+  const fillExample = (target = "presentation") => {
+    const source = String(form.presentation || "").trim();
+    const parts = source.split(/(?<=[。！？!?])/).map((part) => part.trim()).filter(Boolean);
+    if (target === "interruption") {
+      setQaAnswer("我主要负责选择器实现、数据分层和消融实验，理论部分是和组员共同完成的。这个结论目前只在小规模设置下成立，选择器额外开销还需要单独核算。");
+      return;
+    }
+    const next = parts.slice(demoExampleIndex, demoExampleIndex + 2).join("") || source;
+    setTranscript(next);
+    setDemoExampleIndex((index) => parts.length ? (index + 2) % parts.length : index);
   };
   const submitSegment = async (textOverride) => {
     const text = (textOverride ?? transcript).trim();
@@ -335,6 +348,7 @@ function App() {
         setVoiceStatus={setVoiceStatus}
         interruptionVoiceStatus={interruptionVoiceStatus}
         setInterruptionVoiceStatus={setInterruptionVoiceStatus}
+        fillExample={fillExample}
       />
     );
   if (stage === "qa")
@@ -635,6 +649,7 @@ function Presentation({
   setVoiceStatus,
   interruptionVoiceStatus,
   setInterruptionVoiceStatus,
+  fillExample,
 }) {
   return (
     <main className="sim-shell">
@@ -711,6 +726,7 @@ function Presentation({
                 setTranscript={setTranscript}
                 onSegment={submitSegment}
               />
+              <button type="button" className="example-fill" onClick={() => fillExample("presentation")}>填入示例</button>
               <button type="button" onClick={() => submitSegment()}>
                 <Send size={15} /> Submit segment
               </button>
@@ -768,6 +784,7 @@ function Presentation({
                   rows="5"
                 />
                 <div className="interrupt-actions">
+                  <button type="button" className="example-fill" onClick={() => fillExample("interruption")}>填入示例</button>
                   <VoiceButton
                     voiceStatus={interruptionVoiceStatus}
                     setVoiceStatus={setInterruptionVoiceStatus}
