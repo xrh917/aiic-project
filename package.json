@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {"dev": "vite", "build": "vite build", "test": "node --test"},
+  "scripts": {"dev": "vite", "build": "vite build", "start": "node --env-file=.env server.js", "test": "node --test"},
   "dependencies": {"@vitejs/plugin-react": "latest", "vite": "latest", "react": "latest", "react-dom": "latest", "lucide-react": "latest"},
   "devDependencies": {}
 }

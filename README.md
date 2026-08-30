@@ -35,6 +35,19 @@ npm run build
 
 当前版本使用本地 mock，保留了替换为 OpenAI-compatible LLM 和 ASR 的边界；语音按钮使用浏览器 Speech Recognition，不支持时文字模式仍可完整运行。
 
+### DeepSeek API 配置
+
+将 `.env.example` 复制为服务器上的 `.env`，填入 DeepSeek 官方 API Key。`.env` 已被 `.gitignore` 忽略，禁止提交到 Git：
+
+```bash
+cp .env.example .env
+# 编辑 .env，填写 DEEPSEEK_API_KEY
+npm run build
+npm start
+```
+
+浏览器只能访问服务器的 `/api/deepseek` 代理，API Key 不会下发到前端。
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。提交前请确保相关检查和测试通过。
