@@ -82,6 +82,9 @@ function App() {
   const [demoExampleIndex, setDemoExampleIndex] = useState(0);
   const [error, setError] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const transcriptRef = useRef("");
+  const submitSegmentRef = useRef(null);
+  const aiBusyRef = useRef(false);
   const update = (key) => (event) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
   const generate = async (event) => {
@@ -123,11 +126,29 @@ function App() {
       demoMode: true,
     });
   React.useEffect(() => {
-    if (stage !== "presenting") return;
+    if (stage !== "presenting" && stage !== "interrupted") return;
     const id = setInterval(() => {
       setElapsedSeconds((value) => value + 1);
       setSeconds((value) => value - 1);
     }, 1000);
+    return () => clearInterval(id);
+  }, [stage]);
+  React.useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+  React.useEffect(() => {
+    aiBusyRef.current = aiBusy;
+  }, [aiBusy]);
+  React.useEffect(() => {
+    submitSegmentRef.current = submitSegment;
+  });
+  React.useEffect(() => {
+    if (stage !== "presenting") return;
+    const id = setInterval(() => {
+      const pending = transcriptRef.current.trim();
+      if (!pending || aiBusyRef.current) return;
+      submitSegmentRef.current?.(pending);
+    }, 20000);
     return () => clearInterval(id);
   }, [stage]);
   const startPresentation = () => {
@@ -189,6 +210,7 @@ function App() {
       priorInterruptions: interruptions,
       topicCoverage: topicSegments.length ? `已有 ${topicSegments.length} 段与当前议题相关的内容` : "尚未形成明确覆盖",
       hasLaterEvidence: /\d|我负责|我的主要工作|具体|基线|对照/.test(fullText),
+      allowInterruption: elapsedSeconds >= 20 && segments.length > 0,
     });
     setAiBusy(false);
     const interrupted = decision.type === "INTERRUPT" || decision.type === "END_TOPIC" || decision.type === "SWITCH_TOPIC";
@@ -197,7 +219,7 @@ function App() {
     const entry = { text, at: seconds, speaker: "candidate" };
     setSegments((s) => [...s, entry]);
     setTranscript("");
-    if (reason) {
+    if (reason && elapsedSeconds >= 20 && segments.length > 0) {
       const item = { reason, question, at: seconds };
       setInterruption(item);
       setInterruptions((s) => [...s, item]);
@@ -382,6 +404,7 @@ function App() {
         profile={profile}
         segments={segments}
         interruption={interruption}
+        phase={stage === "interrupted" ? "answering" : "presenting"}
         transcript={transcript}
         setTranscript={setTranscript}
         submitSegment={submitSegment}
@@ -683,6 +706,7 @@ function Presentation({
   profile,
   segments,
   interruption,
+  phase,
   transcript,
   setTranscript,
   submitSegment,
@@ -721,6 +745,9 @@ function Presentation({
             <strong>{countdown}</strong>
             <span>{overLimit ? "超出建议时长" : "剩余时间"}</span>
           </div>
+        </div>
+        <div className="phase-indicator" aria-live="polite">
+          {phase === "answering" ? "阶段 2 · 回复教授打断" : "阶段 1 · 个人陈述"}
         </div>
         {nearLimit && (
           <div className="time-notice">
@@ -819,7 +846,7 @@ function Presentation({
             <>
               <div className="quote">“{interruption.question}”</div>
               <p className="interrupt-note">
-                计时没有暂停。回答后，你需要自己决定从哪里继续。
+                计时持续进行。回答提交后将自动回到个人陈述阶段，回答耗时也计入总时长。
               </p>
               <form onSubmit={answerInterruption}>
                 <textarea

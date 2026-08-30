@@ -38,6 +38,7 @@ export async function generateProfessorProfileAI(input) {
 
 export async function decideInterruptionAI(context) {
   const local = decideInterruption(context);
+  if (context.allowInterruption === false) return { type: "CONTINUE" };
   if (context.mode === "none" || context.interruptionCount >= (context.mode === "pressure" ? 4 : 2)) return { type: "CONTINUE" };
   if (context.lastInterruptionAt !== null && Math.abs(context.lastInterruptionAt - context.secondsLeft) < 35) return { type: "CONTINUE" };
   try {
