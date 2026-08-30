@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowRight, BrainCircuit, Check, FileText, FlaskConical, Mic, RotateCcw, UserRound, Clock3, ShieldAlert, Send, BarChart3 } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Check, FileText, FlaskConical, Mic, RotateCcw, UserRound, ShieldAlert, Send, BarChart3 } from 'lucide-react';
 import { generateProfessorProfile } from './profile';
 import { decideInterruption } from './controller';
 import { calculateRecoveryScore } from './scoring';
