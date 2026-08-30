@@ -106,7 +106,7 @@ export async function generateInterruptionAnswerAI({ profile, segments, interrup
 export async function generateReportAI({ profile, segments, qaLog, fallback }) {
   try {
     const content = await askDeepSeek([
-      { role: "system", content: "你是有经验的保研复试教授。请基于完整面试记录和教授 agenda 返回合法 JSON 对象，不要 Markdown。对象必须包含 overall_impression(整体印象字符串)、strengths(2-4 条具体优点数组)、dimensions(数组，固定包含科研理解、个人贡献、证据与严谨性、方法取舍与研究思维、表达结构、打断恢复六项；每项包含 name, score(1-5), evidence(逐字原话或‘证据不足’), observation, impact)、priority_improvements(最多3项，每项包含 quote, category(事实错误|证据不足|表达可以更紧凑), issue, impact, advice)。只评价记录中有依据的内容；没有证据时写‘证据不足’，不要臆测；已经在后文补充的内容不能重复批评。" },
+      { role: "system", content: "你是有经验的保研复试教授。请基于完整面试记录和教授 agenda 返回合法 JSON 对象，不要 Markdown。对象必须包含 overall_impression(整体印象字符串)、strengths(2-4 条具体优点数组)、recovery_score(0-100 的打断恢复分，结合打断次数、回答是否直接、恢复后是否重复来判断)、dimensions(数组，固定包含科研理解、个人贡献、证据与严谨性、方法取舍与研究思维、表达结构、打断恢复六项；每项包含 name, score(1-5), evidence(逐字原话或‘证据不足’), observation, impact)、priority_improvements(最多3项，每项包含 quote, category(事实错误|证据不足|表达可以更紧凑), issue, impact, advice)。只评价记录中有依据的内容；没有证据时写‘证据不足’，不要臆测；已经在后文补充的内容不能重复批评。" },
       { role: "user", content: `教授画像：${JSON.stringify(profile.professor_profile)}\n陈述：${JSON.stringify(segments)}\n问答：${JSON.stringify(qaLog)}` },
     ]);
     const report = jsonFrom(content);
@@ -114,6 +114,7 @@ export async function generateReportAI({ profile, segments, qaLog, fallback }) {
     return {
       ...fallback,
       overallImpression: report.overall_impression || fallback.overallImpression,
+      recovery: Number.isFinite(Number(report.recovery_score)) ? Math.max(0, Math.min(100, Math.round(Number(report.recovery_score)))) : fallback.recovery,
       strengths: Array.isArray(report.strengths) ? report.strengths.slice(0, 4) : fallback.strengths,
       dimensions: report.dimensions.slice(0, 6),
       priorityImprovements: Array.isArray(report.priority_improvements) ? report.priority_improvements.slice(0, 3) : fallback.priorityImprovements,
@@ -128,12 +129,18 @@ export async function generateReportAI({ profile, segments, qaLog, fallback }) {
 export async function generateImprovedPresentationAI({ profile, presentation, report }) {
   try {
     const content = await askDeepSeek([
-      { role: "system", content: "你是保研复试表达教练。只返回合法 JSON 对象，不要 Markdown。对象包含 script(一份 3-5 分钟、口语化但严谨的中文个人陈述) 和 edits(数组，最多 6 项；每项包含 original、improved、reason)。script 必须保留原材料中的真实事实和数字，不得编造经历；改进应优先解决报告指出的问题，并加入自然自我介绍、个人贡献边界、方法理由和结论边界。" },
+      { role: "system", content: "你是保研复试表达教练。只返回合法 JSON 对象，不要 Markdown。对象包含 script(一份 3-5 分钟、口语化但严谨的中文个人陈述) 和 edits(数组，最多 6 项；每项包含 original、improved、reason)。只标注实质性优化：补充缺失证据、澄清个人贡献、解释方法取舍、调整结构或删除明显重复；仅换同义词、标点、语气词或少量字词时不要放入 edits。script 必须保留原材料中的真实事实和数字，不得编造经历；改进应优先解决报告指出的问题，并加入自然自我介绍、个人贡献边界、方法理由和结论边界。" },
       { role: "user", content: `教授画像：${JSON.stringify(profile?.professor_profile || {})}\n原发言稿：${presentation}\n本轮报告：${JSON.stringify(report)}` },
     ]);
     const result = jsonFrom(content);
     if (!result || typeof result.script !== "string" || !result.script.trim()) throw new Error("invalid improved script");
-    return { script: result.script.trim(), edits: Array.isArray(result.edits) ? result.edits.slice(0, 6) : [] };
+    const edits = (Array.isArray(result.edits) ? result.edits : []).filter((edit) => {
+      const original = String(edit.original || "").replace(/[\s，。！？、,.!?；;：:‘’“”"']/g, "");
+      const improved = String(edit.improved || "").replace(/[\s，。！？、,.!?；;：:‘’“”"']/g, "");
+      if (!original || !improved || original === improved) return false;
+      return Math.abs(original.length - improved.length) >= 8 || !original.includes(improved.slice(0, Math.min(12, improved.length)));
+    }).slice(0, 6);
+    return { script: result.script.trim(), edits };
   } catch (error) {
     console.warn("DeepSeek improved presentation fallback:", error.message);
     return { script: String(presentation || "").trim(), edits: [] };

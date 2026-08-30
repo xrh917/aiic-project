@@ -227,7 +227,11 @@ function App() {
   };
   const finishReport = async (answerLog = qaLog) => {
     const elapsed = Number(form.duration) * 60 - seconds;
-    const resumeDelay = interruptions.length * 6;
+    const recoveryAnswers = segments.filter((segment) => segment.interruption);
+    const resumeDelay = interruptions.reduce((total, _item, index) => {
+      const answer = recoveryAnswers[index]?.text || "";
+      return total + Math.max(2, Math.min(30, Math.round(answer.length / 12) || 6));
+    }, 0);
     const score = calculateRecoveryScore({
       interruptionCount: interruptions.length,
       resumeDelay,
