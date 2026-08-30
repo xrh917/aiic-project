@@ -23,6 +23,9 @@ temp/
 *.log
 *.aux
 *.out
+*.mp4
+*.mov
+*.webm
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

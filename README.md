@@ -1,6 +1,10 @@
-# aiic-project
+# MentorSimulator / aiic-project
 
 面向理工科本科生保研复试的 AI Professor Interview Simulator。它根据目标教授与候选人材料生成有研究 agenda 的模拟导师，并在个人陈述中主动打断、控制节奏，最后给出可执行的恢复建议。
+
+项目名称：**MentorSimulator：AI Professor Interview Simulator**
+
+演示提交材料包括公网产品链接、3 分钟以内 Demo 视频和 `product-memo.pdf`。录屏与剪辑视频保存在本地，不纳入 Git 仓库；仓库本身保持公开，便于评委查看代码和迭代记录。
 
 ## 开始使用
 
