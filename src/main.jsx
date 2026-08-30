@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ArrowRight, BrainCircuit, Check, FileText, FlaskConical, Mic, RotateCcw, UserRound, Clock3, ShieldAlert, Send, BarChart3 } from 'lucide-react';
 import { generateProfessorProfile } from './profile';
 import { decideInterruption } from './controller';
+import { calculateRecoveryScore } from './scoring';
 import './styles.css';
 
 const initial = { candidateMaterials: '', presentation: '', professorName: '', affiliation: '', researchDirection: '', homepage: '', papers: '', duration: 5, interruptionMode: 'kind' };
@@ -42,9 +43,9 @@ function App() {
     if (reason) { const item = { reason, question, at: seconds }; setInterruption(item); setInterruptions((s) => [...s, item]); setStage('interrupted'); }
   };
   const answerInterruption = (e) => { e.preventDefault(); if (!qaAnswer.trim()) return; setSegments((s) => [...s, { text: qaAnswer.trim(), at: seconds, speaker: 'candidate', interruption: true }]); setQaAnswer(''); setInterruption(null); setStage('presenting'); };
-  const endPresentation = () => { setStage('qa'); setQaIndex(0); setSeconds(0); };
+  const endPresentation = () => { setStage('qa'); setQaIndex(0); };
   const currentQuestion = profile?.agenda?.[qaIndex]?.questions?.[qaLog.filter((x) => x.topic === profile?.agenda?.[qaIndex]?.topic).length || 0] || profile?.agenda?.[qaIndex]?.questions?.[0] || '你希望在研究生阶段继续探索什么问题？';
-  const submitAnswer = (e) => { e.preventDefault(); if (!qaAnswer.trim()) return; const nextLog = [...qaLog, { topic: profile.agenda[qaIndex].topic, question: currentQuestion, answer: qaAnswer.trim() }]; setQaLog(nextLog); setQaAnswer(''); if (qaIndex + 1 >= Math.min(3, profile.agenda.length)) { const score = Math.max(35, 82 - interruptions.length * 7 - Math.max(0, 60 - seconds)); const next = { recovery: score, interruptionCount: interruptions.length, interruptionDuration: interruptions.length * 12, resumeDelay: interruptions.length * 6, qaLog: nextLog, duration: Number(form.duration) * 60 - seconds }; setReport(next); sessionStorage.setItem('aiic-report', JSON.stringify(next)); setStage('report'); } else setQaIndex((i) => i + 1); };
+  const submitAnswer = (e) => { e.preventDefault(); if (!qaAnswer.trim()) return; const nextLog = [...qaLog, { topic: profile.agenda[qaIndex].topic, question: currentQuestion, answer: qaAnswer.trim() }]; setQaLog(nextLog); setQaAnswer(''); if (qaIndex + 1 >= Math.min(3, profile.agenda.length)) { const elapsed = Number(form.duration) * 60 - seconds; const resumeDelay = interruptions.length * 6; const score = calculateRecoveryScore({ interruptionCount: interruptions.length, resumeDelay, elapsedSeconds: elapsed, totalSeconds: Number(form.duration) * 60 }); const next = { recovery: score, interruptionCount: interruptions.length, interruptionDuration: interruptions.length * 12, resumeDelay, qaLog: nextLog, duration: elapsed }; setReport(next); sessionStorage.setItem('aiic-report', JSON.stringify(next)); setStage('report'); } else setQaIndex((i) => i + 1); };
   const reset = () => { setStage('setup'); setProfile(null); setReport(null); setForm(initial); sessionStorage.clear(); };
   const clock = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   if (stage === 'presenting' || stage === 'interrupted') return <Presentation clock={clock} profile={profile} segments={segments} interruption={interruption} transcript={transcript} setTranscript={setTranscript} submitSegment={submitSegment} qaAnswer={qaAnswer} setQaAnswer={setQaAnswer} answerInterruption={answerInterruption} endPresentation={endPresentation} voiceStatus={voiceStatus} setVoiceStatus={setVoiceStatus} />;
