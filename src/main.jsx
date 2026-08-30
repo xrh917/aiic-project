@@ -568,14 +568,27 @@ function Presentation({
               <ShieldAlert size={14} /> Controller 会检查内容并决定是否打断
             </span>
             <span className="input-buttons">
-              <VoiceButton voiceStatus={voiceStatus} setVoiceStatus={setVoiceStatus} setTranscript={setTranscript} onSegment={submitSegment} />
+              <VoiceButton
+                voiceStatus={voiceStatus}
+                setVoiceStatus={setVoiceStatus}
+                setTranscript={setTranscript}
+                onSegment={submitSegment}
+              />
               <button onClick={submitSegment}>
                 <Send size={15} /> Submit segment
               </button>
             </span>
           </div>
-          {voiceStatus === "listening" && <p className="voice-ready" aria-live="polite"><span /> 可以开始说话</p>}
-          {voiceStatus === "reconnecting" && <p className="voice-hint" aria-live="polite">正在重新连接语音识别…</p>}
+          {voiceStatus === "listening" && (
+            <p className="voice-ready" aria-live="polite">
+              <span /> 可以开始说话
+            </p>
+          )}
+          {voiceStatus === "reconnecting" && (
+            <p className="voice-hint" aria-live="polite">
+              正在重新连接语音识别…
+            </p>
+          )}
           {voiceStatus === "unsupported" && (
             <p className="voice-hint">
               当前浏览器不支持语音识别，请继续使用文字输入。
@@ -587,7 +600,9 @@ function Presentation({
             </p>
           )}
           {voiceStatus === "secure-required" && (
-            <p className="voice-hint">语音输入需要 HTTPS 安全连接，请使用 https 地址并允许麦克风权限。</p>
+            <p className="voice-hint">
+              语音输入需要 HTTPS 安全连接，请使用 https 地址并允许麦克风权限。
+            </p>
           )}
           <button className="finish" onClick={endPresentation}>
             Finish presentation <ArrowRight size={15} />
@@ -757,12 +772,28 @@ function Report({ profile, report, reset }) {
     </main>
   );
 }
-function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript, onSegment }) {
+function VoiceButton({
+  voiceStatus,
+  setVoiceStatus,
+  setTranscript,
+  onSegment,
+}) {
   const recognitionRef = useRef(null);
   const activeRef = useRef(false);
   const bufferRef = useRef("");
-  const onSegmentRef = useRef(onSegment); onSegmentRef.current = onSegment;
-  React.useEffect(() => { const id = window.setInterval(() => { if (!activeRef.current) return; const text = bufferRef.current.trim(); if (!text) return; bufferRef.current = ""; setTranscript(""); onSegmentRef.current(text); }, 15000); return () => window.clearInterval(id); }, []);
+  const onSegmentRef = useRef(onSegment);
+  onSegmentRef.current = onSegment;
+  React.useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!activeRef.current) return;
+      const text = bufferRef.current.trim();
+      if (!text) return;
+      bufferRef.current = "";
+      setTranscript("");
+      onSegmentRef.current(text);
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, []);
   const toggle = () => {
     if (!window.isSecureContext) return setVoiceStatus("secure-required");
     const API = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -780,12 +811,20 @@ function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript, onSegment }) 
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    recognition.onstart = () => setVoiceStatus("listening");
+    recognition.onstart = () => {
+      setVoiceStatus("warming");
+      window.setTimeout(() => {
+        if (activeRef.current) setVoiceStatus("listening");
+      }, 700);
+    };
     recognition.onresult = (event) => {
       let chunk = "";
       for (let i = event.resultIndex; i < event.results.length; i += 1)
         if (event.results[i].isFinal) chunk += event.results[i][0].transcript;
-      if (chunk) { bufferRef.current = `${bufferRef.current} ${chunk}`.trim(); setTranscript((value) => `${value} ${chunk}`.trim()); }
+      if (chunk) {
+        bufferRef.current = `${bufferRef.current} ${chunk}`.trim();
+        setTranscript((value) => `${value} ${chunk}`.trim());
+      }
     };
     recognition.onerror = (event) => {
       if (
@@ -809,21 +848,38 @@ function VoiceButton({ voiceStatus, setVoiceStatus, setTranscript, onSegment }) 
         }
       }, 250);
     };
-    try {
-      recognition.start();
-    } catch {
-      activeRef.current = false;
-      setVoiceStatus("error");
-    }
+    setVoiceStatus("warming");
+    const warmup = navigator.mediaDevices?.getUserMedia
+      ? navigator.mediaDevices.getUserMedia({ audio: true })
+      : Promise.resolve(null);
+    warmup
+      .then((stream) => {
+        stream?.getTracks().forEach((track) => track.stop());
+        if (!activeRef.current) return;
+        window.setTimeout(() => {
+          try {
+            recognition.start();
+          } catch {
+            activeRef.current = false;
+            setVoiceStatus("error");
+          }
+        }, 300);
+      })
+      .catch(() => {
+        activeRef.current = false;
+        setVoiceStatus("error");
+      });
   };
   return (
     <button type="button" className="voice" onClick={toggle}>
       <Mic size={15} />{" "}
       {voiceStatus === "listening"
         ? "Stop voice"
-        : voiceStatus === "reconnecting"
-          ? "Reconnecting…"
-          : "Voice"}
+        : voiceStatus === "warming"
+          ? "Preparing mic…"
+          : voiceStatus === "reconnecting"
+            ? "Reconnecting…"
+            : "Voice"}
     </button>
   );
 }
