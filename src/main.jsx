@@ -315,6 +315,7 @@ function App() {
     return (
       <Presentation
         elapsed={clock}
+        countdown={`${String(Math.floor(Math.max(seconds, 0) / 60)).padStart(2, "0")}:${String(Math.max(seconds, 0) % 60).padStart(2, "0")}`}
         overLimit={elapsedSeconds >= Number(form.duration) * 60}
         nearLimit={
           elapsedSeconds >= Number(form.duration) * 60 - 30 &&
@@ -617,6 +618,7 @@ function App() {
 }
 function Presentation({
   elapsed,
+  countdown,
   overLimit,
   nearLimit,
   profile,
@@ -656,8 +658,8 @@ function Presentation({
           </div>
           <div className={overLimit ? "elapsed overtime" : "elapsed"}>
             <Clock3 size={17} />
-            <strong>{elapsed}</strong>
-            <span>{overLimit ? "over recommended limit" : "elapsed"}</span>
+            <strong>{countdown}</strong>
+            <span>{overLimit ? "超出建议时长" : "剩余时间"}</span>
           </div>
         </div>
         {nearLimit && (
