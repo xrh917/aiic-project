@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { generateProfessorProfile } from "./profile";
 import { decideInterruption } from "./controller";
-import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI, generatePresentationContinuationAI } from "./ai";
+import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI, generatePresentationContinuationAI, generateInterruptionAnswerAI } from "./ai";
 import { calculateRecoveryScore } from "./scoring";
 import { analyzeEvidence } from "./feedback";
 import "./styles.css";
@@ -167,6 +167,16 @@ function App() {
       setInterruption(item);
       setInterruptions((s) => [...s, item]);
       setStage("interrupted");
+      if (form.demoMode) {
+        setAiBusy(true);
+        const answer = await generateInterruptionAnswerAI({
+          profile,
+          segments: [...segments, entry],
+          interruption: item,
+        });
+        setQaAnswer(answer);
+        setAiBusy(false);
+      }
     }
   };
   const answerInterruption = async (e) => {

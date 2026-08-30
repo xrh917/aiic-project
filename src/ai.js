@@ -88,6 +88,21 @@ export async function generatePresentationContinuationAI({ profile, presentation
   }
 }
 
+export async function generateInterruptionAnswerAI({ profile, segments, interruption }) {
+  try {
+    const content = await askDeepSeek([
+      { role: "system", content: "你是保研复试候选人。只返回一段自然的中文口语回答，不要 Markdown，不要解释。针对教授打断的问题，用 2-4 句直接回答，明确个人负责内容、方法理由或实验边界，不要重复整段背景。" },
+      { role: "user", content: `教授画像：${JSON.stringify(profile?.professor_profile || {})}\n已讲内容：${JSON.stringify(segments)}\n教授打断：${JSON.stringify(interruption)}` },
+    ]);
+    const text = content.trim();
+    if (!text) throw new Error("empty interruption answer");
+    return text;
+  } catch (error) {
+    console.warn("DeepSeek interruption answer fallback:", error.message);
+    return "我先直接回答这一点：我负责的是选择器实现、数据分层和消融实验，理论部分是和组员共同完成的。这个结论目前只在小规模设置下成立，选择器额外开销还需要单独核算。";
+  }
+}
+
 export async function generateReportAI({ profile, segments, qaLog, fallback }) {
   try {
     const content = await askDeepSeek([
