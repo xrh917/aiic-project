@@ -1,6 +1,6 @@
-# AIIC 脱敏演示材料
+# AIIC 生成的脱敏演示材料
 
-> 用于演示 Setup → Professor → Presentation → Interruption → Report。内容是合成测试数据，姓名、学校、实验室和作者身份均已脱敏。
+> 本文件为 AIIC 生成的合成脱敏测试材料，仅用于演示 Setup → Professor → Presentation → Interruption → Report，不对应任何真实个人。
 
 ## Candidate materials
 
