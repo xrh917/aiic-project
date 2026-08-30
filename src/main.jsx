@@ -75,14 +75,17 @@ function App() {
     setForm({
       ...initial,
       candidateMaterials:
-        "我在课程项目中实现了面向校园规章问答的检索增强系统，负责 agent 路由、离线评测和错误分析。系统准确率从 61% 提升到 78%，跨章节问题召回率提升 14 个百分点。",
-      presentation: "我的陈述分为研究动机、系统设计、实验结果和未来计划。",
-      professorName: "王教授（测试画像）",
-      affiliation: "清华大学 · 智能系统与可信学习实验室",
-      researchDirection: "多智能体系统、强化学习、语言模型工具调用、可信 AI",
+        "我和两位同学完成了一个用最优控制做语言模型预训练数据筛选的复现项目。我个人负责数据选择器、costate 近似训练循环、数据来源分层和消融实验。我们使用 1.2 亿 token 语料和 125M decoder-only Transformer，比较 Uniform、Perplexity、Gradient-norm 与 PDS。PDS 将达到相同验证损失所需 token 从 100M 降到 76M，验证集 loss 为 3.02；但选择器需要额外计算，且小模型结果不能直接推广到 400B 模型。我还复现了在线 pairwise learning-to-rank 原型，发现 uncertainty-only exploration 在点击偏差强时会过早相信错误排序。",
+      presentation:
+        "我的陈述分为研究问题、方法直觉、系统实现、实验结果、失败与局限、下一步研究六部分。",
+      professorName: "周教授（脱敏画像）",
+      affiliation: "华北某重点大学 · 决策智能与交互学习实验室",
+      researchDirection:
+        "机器学习、信息检索、序列决策、在线学习、语言模型 agent、可信推荐系统",
       homepage:
-        "关注复杂环境中的智能体协作与决策，面试风格直接，重视个人贡献和可验证证据。",
-      papers: "Coordinating Language Agents under Limited Compute",
+        "长期研究机器学习与信息检索交叉问题，关注序列决策和在线反馈，面试重视 baseline、实验公平、个人贡献和结论边界。",
+      papers:
+        "通过最优控制进行语言模型数据选择；通过分治进行在线成对排序学习；面向序列决策的用户反馈建模",
       duration: 5,
       interruptionMode: "kind",
     });
