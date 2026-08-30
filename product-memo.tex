@@ -1,0 +1,59 @@
+\documentclass[UTF8,10pt,a4paper]{ctexart}
+\usepackage[a4paper,margin=1.45cm]{geometry}
+\usepackage{enumitem,tabularx,booktabs,hyperref,xcolor}
+\hypersetup{colorlinks=true,urlcolor=teal,linkcolor=teal}
+\setlength{\parindent}{0pt}\setlength{\parskip}{2pt}
+\setlist{nosep,leftmargin=1.4em}
+\newcommand{\tagline}[1]{\textcolor{teal}{\textbf{#1}}}
+\begin{document}
+\begin{center}
+{\LARGE\bfseries AIIC Product Memo}\par
+\vspace{2pt}
+{\small 面向理工科本科生保研复试的 AI Professor Interview Simulator}\par
+{\footnotesize 公网：\url{https://82.156.250.184/} \quad GitHub：\url{https://github.com/xrh917/aiic-project}}
+\end{center}
+\hrule\vspace{4pt}
+
+\section*{1. 目标用户与核心痛点}
+目标用户是有科研或竞赛经历、正在准备保研复试的理工科本科生。真实场景是：学生要在有限时间内讲清项目的问题、方法、个人贡献和实验边界，同时应对目标导师临时打断。普通聊天式 AI 的问题往往过于官方、与目标导师研究弱相关；模型还容易被候选人最后一句带偏，缺少稳定的考察 agenda。学生尤其缺少被打断后的恢复训练，容易重复背景、超时或遗漏核心贡献，而常见反馈只有一个笼统分数。
+
+\section*{2. 产品设计与 MVP 闭环}
+\textbf{产品判断：}核心不是让 AI 多问几个问题，而是模拟一个有研究兴趣、有隐藏 agenda、会主动打断并控制节奏的目标教授。
+
+\begin{center}\small
+\texttt{Setup $\rightarrow$ Professor Profile $\rightarrow$ Presentation $\rightarrow$ Timed Interruption $\rightarrow$ Response $\rightarrow$ Evidence Report $\rightarrow$ Retry}
+\end{center}
+\begin{itemize}
+\item 输入候选人材料、个人陈述和教授信息，由 DeepSeek 生成教授画像与 hidden agenda。
+\item 个人陈述和回复教授打断是两个阶段；陈述阶段每 20 秒检查一次内容，回复阶段不再二次打断，倒计时持续运行。
+\item 打断依据包括研究兴趣、证据不足、个人贡献、方法取舍和节奏过慢；每个 topic 的追问次数受 agenda 约束。
+\item 报告记录实际用时、超时秒数与扣分、打断次数、回答耗时、恢复分，并用“原话 → 问题 → 影响 → 建议”给出反馈。
+\item 支持静默观察、标准追问和高压追问；改进发言稿可直接用于下一轮。
+\end{itemize}
+
+\textbf{音频设计：}文字输入保证完整闭环；示例稿可直接填入练习；教授问题和示例回答可用浏览器 speechSynthesis 朗读；真人模式使用浏览器 Speech Recognition 转写。语音有启动锁、受控重连和缓冲，权限、浏览器或 ASR 失败时自动保留文字路径。
+
+刻意不做 webcam、表情识别、数字人、自动爬论文、登录数据库和强制深度问答，以保证 16 小时内完成核心训练闭环并控制隐私与实现成本。
+
+\section*{3. 竞品与开源调研}
+公开产品已验证语音角色扮演和表达反馈的价值：\href{https://support.yoodli.ai/en/articles/9550465-practice-with-yoodli}{Yoodli} 支持角色、演讲和动态 follow-up；\href{https://www.finalroundai.com/}{Final Round AI} 支持上传简历、面试练习和 debrief；\href{https://huru.ai/}{Huru} 提供岗位导向的 AI 面试练习。开源项目 \href{https://github.com/IliaLarchenko/Interviewer}{Interviewer} 拆分 LLM/STT/TTS，\href{https://github.com/J3rry320/interview-coach}{Interview Coach} 采用可替换模型与浏览器语音，\href{https://github.com/Priyansh143/Cognix-AI}{Cognix-AI} 采用状态驱动控制器，\href{https://github.com/codexsys-7/ai-interview}{InterVue Labs} 探索记忆、VAD 和音频队列。
+
+AIIC 借鉴“状态控制器 + 语音模块 + 结构化报告”，但聚焦保研科研陈述的教授 agenda、主动打断和恢复证据，而不是通用求职问答或实时代答。
+
+\section*{4. 版本迭代与下一步}
+最初的关键词/固定打断会重复追问，后来改为 DeepSeek 读取完整历史、topic 覆盖和既有打断；倒计时暂停会削弱真实压力，改为两阶段共享计时；单一分数解释力不足，改为六维能力与原话证据；语音不稳定则以文字降级并加入受控重连。
+
+如果再给一周，优先做：\textbf{(1)} 项目逻辑链拆解（问题→假设→方法→对照→结果→局限），支持横向/纵向追问；\textbf{(2)} 每个项目的 evidence pack，保存基线、实验设置和个人贡献，避免多轮追问后失去事实锚点；\textbf{(3)} 表达逻辑审计，识别因果跳跃、证据顺序、重复铺垫并生成重排稿；\textbf{(4)} 接入 Whisper-compatible ASR、端点检测和噪声处理；\textbf{(5)} 用真实学生与导师标注校准评分并比较多轮差异。
+
+\section*{5. AI 工具使用与边界}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+工具 & 用途与边界\\\midrule
+DeepSeek API & 教授画像、打断判断、续讲、打断回答、结构化报告和发言稿优化；服务端代理，失败有本地兜底。\\
+Codex & 前端、后端代理、测试、部署和调试；产品范围与交互取舍由项目完成者决定。\\
+Speech Recognition / speechSynthesis & 分别用于真人语音转写和教授/示例朗读；均为增强能力，文字模式始终可用。\\
+\bottomrule
+\end{tabularx}
+
+所有演示材料使用脱敏或生成数据。AI 反馈是训练建议，不代表真实录取结论；语音只在当前 session 转写，不建立长期用户数据库。MVP 成功标准是用户能完成一次有时间压力的闭环，并获得可复盘的原话证据，而不是生成一个看似精确的录取分数。
+\end{document}
