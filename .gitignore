@@ -21,6 +21,8 @@ temp/
 
 # Logs and local tooling
 *.log
+*.aux
+*.out
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -32,4 +34,3 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
-
