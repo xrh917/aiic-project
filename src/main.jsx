@@ -21,6 +21,16 @@ import { calculateRecoveryScore } from "./scoring";
 import { analyzeEvidence } from "./feedback";
 import "./styles.css";
 
+class AppErrorBoundary extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error) { console.error("AIIC render error:", error); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <main className="shell"><section className="panel error-screen"><h1>页面遇到一个暂时错误</h1><p>你的面试材料仍保存在当前会话中。刷新页面后可以继续。</p><button className="primary-wide" onClick={() => window.location.reload()}>刷新页面</button></section></main>;
+  }
+}
+
 const initial = {
   candidateMaterials: "",
   presentation: "",
@@ -902,4 +912,4 @@ function VoiceButton({
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(<AppErrorBoundary><App /></AppErrorBoundary>);
