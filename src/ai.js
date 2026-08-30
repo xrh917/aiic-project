@@ -106,15 +106,15 @@ export async function generateInterruptionAnswerAI({ profile, segments, interrup
 export async function generateReportAI({ profile, segments, qaLog, fallback }) {
   try {
     const content = await askDeepSeek([
-      { role: "system", content: "你是有经验的保研复试教授。请基于完整面试记录和教授 agenda 返回合法 JSON 对象，不要 Markdown。对象必须包含 overall_impression(整体印象字符串)、strengths(2-4 条具体优点数组)、recovery_score(0-100 的打断恢复分，结合打断次数、回答是否直接、恢复后是否重复来判断)、dimensions(数组，固定包含科研理解、个人贡献、证据与严谨性、方法取舍与研究思维、表达结构、打断恢复六项；每项包含 name, score(1-5), evidence(逐字原话或‘证据不足’), observation, impact)、priority_improvements(最多3项，每项包含 quote, category(事实错误|证据不足|表达可以更紧凑), issue, impact, advice)。只评价记录中有依据的内容；没有证据时写‘证据不足’，不要臆测；已经在后文补充的内容不能重复批评。" },
-      { role: "user", content: `教授画像：${JSON.stringify(profile.professor_profile)}\n陈述：${JSON.stringify(segments)}\n问答：${JSON.stringify(qaLog)}` },
+      { role: "system", content: "你是有经验的保研复试教授。请基于完整面试记录和教授 agenda 返回合法 JSON 对象，不要 Markdown。对象必须包含 overall_impression(整体印象字符串)、strengths(2-4 条具体优点数组)、recovery_score(仅依据输入中的确定分数，不要随机波动)、dimensions(数组，固定包含科研理解、个人贡献、证据与严谨性、方法取舍与研究思维、表达结构、打断恢复六项；每项包含 name, score(1-5), evidence(逐字原话或‘证据不足’), observation, impact)、priority_improvements(最多3项，每项包含 quote, category(事实错误|证据不足|表达可以更紧凑), issue, impact, advice)。只评价记录中有依据的内容；没有证据时写‘证据不足’，不要臆测；已经在后文补充的内容不能重复批评。若输入包含 overtimeSeconds > 0，必须在 priority_improvements 中明确指出超时及其影响。" },
+      { role: "user", content: `教授画像：${JSON.stringify(profile.professor_profile)}\n陈述：${JSON.stringify(segments)}\n问答：${JSON.stringify(qaLog)}\n本轮确定计分：${JSON.stringify({ recovery: fallback.recovery, duration: fallback.duration, totalDuration: fallback.totalDuration, overtimeSeconds: fallback.overtimeSeconds, overtimePenalty: fallback.overtimePenalty })}` },
     ]);
     const report = jsonFrom(content);
     if (!report || typeof report !== "object" || !Array.isArray(report.dimensions)) throw new Error("invalid report");
     return {
       ...fallback,
       overallImpression: report.overall_impression || fallback.overallImpression,
-      recovery: Number.isFinite(Number(report.recovery_score)) ? Math.max(0, Math.min(100, Math.round(Number(report.recovery_score)))) : fallback.recovery,
+      recovery: fallback.recovery,
       strengths: Array.isArray(report.strengths) ? report.strengths.slice(0, 4) : fallback.strengths,
       dimensions: report.dimensions.slice(0, 6),
       priorityImprovements: Array.isArray(report.priority_improvements) ? report.priority_improvements.slice(0, 3) : fallback.priorityImprovements,

@@ -62,7 +62,10 @@ function App() {
   const [profile, setProfile] = useState(() =>
     JSON.parse(sessionStorage.getItem("aiic-profile") || "null"),
   );
-  const [stage, setStage] = useState(profile ? "profile" : "setup");
+  const [report, setReport] = useState(() =>
+    JSON.parse(sessionStorage.getItem("aiic-report") || "null"),
+  );
+  const [stage, setStage] = useState(() => (report ? "report" : profile ? "profile" : "setup"));
   const [seconds, setSeconds] = useState(Number(form.duration) * 60);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [transcript, setTranscript] = useState("");
@@ -72,7 +75,6 @@ function App() {
   const [qaIndex, setQaIndex] = useState(0);
   const [qaAnswer, setQaAnswer] = useState("");
   const [qaLog, setQaLog] = useState([]);
-  const [report, setReport] = useState(null);
   const [improvedScript, setImprovedScript] = useState(null);
   const [runHistory, setRunHistory] = useState(() => JSON.parse(sessionStorage.getItem("aiic-runs") || "[]"));
   const [voiceStatus, setVoiceStatus] = useState("idle");
@@ -244,6 +246,8 @@ function App() {
   };
   const finishReport = async (answerLog = qaLog) => {
     const elapsed = Number(form.duration) * 60 - seconds;
+    const overtimeSeconds = Math.max(0, elapsed - Number(form.duration) * 60);
+    const overtimePenalty = Math.min(20, overtimeSeconds * 2);
     const recoveryAnswers = segments.filter((segment) => segment.interruption);
     const resumeDelay = interruptions.reduce((total, _item, index) => {
       const answer = recoveryAnswers[index]?.text || "";
@@ -263,6 +267,9 @@ function App() {
       qaLog: answerLog,
       evidence: analyzeEvidence(segments, answerLog),
       duration: elapsed,
+      totalDuration: Number(form.duration) * 60,
+      overtimeSeconds,
+      overtimePenalty,
       overallImpression: "本轮记录已完成，建议结合下方证据复盘表达和科研回答。",
       strengths: ["完成了完整的个人陈述", interruptions.length ? "在教授打断后继续完成了陈述" : "保持了连续的陈述节奏"],
       dimensions: [
@@ -965,7 +972,18 @@ function Report({ profile, report, reset, runHistory = [], improvedScript, optim
             <strong>{report.interruptionCount}</strong>
             <span>professor interruptions</span>
           </div>
+          <div className={`metric panel ${report.overtimeSeconds > 0 ? "metric-warning" : ""}`}>
+            <Clock3 size={18} />
+            <strong>{report.overtimeSeconds > 0 ? `+${report.overtimeSeconds}s` : "0s"}</strong>
+            <span>{report.overtimeSeconds > 0 ? `超时扣 ${report.overtimePenalty} 分` : "未超出陈述时限"}</span>
+          </div>
         </div>
+        {report.overtimeSeconds > 0 && (
+          <section className="evidence panel overtime-evidence">
+            <h2>超时证据</h2>
+            <p className="no-findings">你的陈述实际用时 {report.duration} 秒，超过 {report.totalDuration || 300} 秒限时 {report.overtimeSeconds} 秒，因此恢复分扣除 {report.overtimePenalty} 分。</p>
+          </section>
+        )}
         {runHistory.length > 1 && (
           <section className="comparison panel">
             <div className="comparison-head"><h2>同一材料的模式对比</h2><small>最近 {runHistory.length} 轮</small></div>
@@ -1036,6 +1054,9 @@ function VoiceButton({
 }) {
   const recognitionRef = useRef(null);
   const activeRef = useRef(false);
+  const startingRef = useRef(false);
+  const restartingRef = useRef(false);
+  const generationRef = useRef(0);
   const bufferRef = useRef("");
   const onSegmentRef = useRef(onSegment);
   onSegmentRef.current = onSegment;
@@ -1052,6 +1073,7 @@ function VoiceButton({
   }, []);
   React.useEffect(() => () => {
     activeRef.current = false;
+    generationRef.current += 1;
     recognitionRef.current?.stop();
   }, []);
   const toggle = () => {
@@ -1060,10 +1082,15 @@ function VoiceButton({
     if (!API) return setVoiceStatus("unsupported");
     if (activeRef.current) {
       activeRef.current = false;
+      generationRef.current += 1;
       recognitionRef.current?.stop();
       setVoiceStatus("idle");
       return;
     }
+    if (startingRef.current) return;
+    startingRef.current = true;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     const recognition = new API();
     recognitionRef.current = recognition;
     activeRef.current = true;
@@ -1097,16 +1124,19 @@ function VoiceButton({
     };
     recognition.onend = () => {
       if (!activeRef.current) return setVoiceStatus("idle");
+      if (restartingRef.current) return;
+      restartingRef.current = true;
       setVoiceStatus("reconnecting");
       window.setTimeout(() => {
-        if (activeRef.current) {
+        restartingRef.current = false;
+        if (activeRef.current && generationRef.current === generation) {
           try {
             recognition.start();
           } catch {
             /* restart guard */
           }
         }
-      }, 250);
+      }, 700);
     };
     setVoiceStatus("warming");
     const warmup = navigator.mediaDevices?.getUserMedia
@@ -1115,18 +1145,21 @@ function VoiceButton({
     warmup
       .then((stream) => {
         stream?.getTracks().forEach((track) => track.stop());
-        if (!activeRef.current) return;
+        if (!activeRef.current || generationRef.current !== generation) { startingRef.current = false; return; }
         window.setTimeout(() => {
           try {
             recognition.start();
+            startingRef.current = false;
           } catch {
             activeRef.current = false;
+            startingRef.current = false;
             setVoiceStatus("error");
           }
         }, 300);
       })
       .catch(() => {
         activeRef.current = false;
+        startingRef.current = false;
         setVoiceStatus("error");
       });
   };
