@@ -6,3 +6,6 @@ test('recognizes bilingual multi-agent signal without exact profile wording', ()
 test('checks unsupported evidence', () => assert.equal(decideInterruption({ text: '性能提升比较明显', secondsLeft: 200, totalSeconds: 300, segmentCount: 0 }).reason, 'EVIDENCE CHECK'));
 test('keeps agenda bounded', () => assert.equal(decideInterruption({ text: 'more details', secondsLeft: 200, totalSeconds: 300, segmentCount: 3, maxFollowups: 1 }).type, 'END_TOPIC'));
 test('does not interrupt on time alone', () => assert.equal(decideInterruption({ text: '这是一段很长的背景说明，没有具体触发信号。'.repeat(30), secondsLeft: 20, totalSeconds: 300, segmentCount: 0 }).type, 'CONTINUE'));
+test('none mode never interrupts', () => assert.equal(decideInterruption({ text: '我们采用 Multi-Agent framework', interests: ['多智能体系统'], mode: 'none' }).type, 'CONTINUE'));
+test('kind mode caps interruptions at two', () => assert.equal(decideInterruption({ text: 'we use multi-agent systems', interests: ['multi-agent systems'], mode: 'kind', interruptionCount: 2 }).type, 'CONTINUE'));
+test('pressure mode allows up to four', () => assert.equal(decideInterruption({ text: 'we use multi-agent systems', interests: ['multi-agent systems'], mode: 'pressure', interruptionCount: 3 }).type, 'INTERRUPT'));

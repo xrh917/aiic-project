@@ -1,4 +1,8 @@
-export function decideInterruption({ text, interests = [], secondsLeft, totalSeconds, segmentCount, maxFollowups = 2 }) {
+export function decideInterruption({ text, interests = [], secondsLeft, totalSeconds, segmentCount, maxFollowups = 2, mode = 'kind', interruptionCount = 0, lastInterruptionAt = null }) {
+  if (mode === 'none') return { type: 'CONTINUE' };
+  const maxInterruptions = mode === 'pressure' ? 4 : 2;
+  if (interruptionCount >= maxInterruptions) return { type: 'CONTINUE' };
+  if (lastInterruptionAt !== null && Math.abs(lastInterruptionAt - secondsLeft) < 35) return { type: 'CONTINUE' };
   const lower = text.toLowerCase();
   const interestHit = interests.find((x) => lower.includes(x.toLowerCase())) || (/multi[- ]?agent|多智能体/.test(lower) ? '多智能体系统' : null);
   if (interestHit) return { type: 'INTERRUPT', reason: 'PROFESSOR INTEREST', question: `等一下。你刚才提到${interestHit}，为什么这里必须采用这个方向？单 Agent 为什么不行？` };

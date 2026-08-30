@@ -5,7 +5,7 @@ import { generateProfessorProfile } from './profile';
 import { decideInterruption } from './controller';
 import './styles.css';
 
-const initial = { candidateMaterials: '', presentation: '', professorName: '', affiliation: '', researchDirection: '', homepage: '', papers: '', duration: 5 };
+const initial = { candidateMaterials: '', presentation: '', professorName: '', affiliation: '', researchDirection: '', homepage: '', papers: '', duration: 5, interruptionMode: 'kind' };
 
 function App() {
   const [form, setForm] = useState(() => JSON.parse(sessionStorage.getItem('aiic-setup') || 'null') || initial);
@@ -36,7 +36,7 @@ function App() {
   const submitSegment = () => {
     const text = transcript.trim(); if (!text) return;
     const lower = text.toLowerCase(); const topic = profile.agenda[Math.min(segments.length, profile.agenda.length - 1)];
-    const decision = decideInterruption({ text, interests: profile.professor_profile.research_interests, secondsLeft: seconds, totalSeconds: Number(form.duration) * 60, segmentCount: segments.length, maxFollowups: topic?.max_followups });
+    const decision = decideInterruption({ text, interests: profile.professor_profile.research_interests, secondsLeft: seconds, totalSeconds: Number(form.duration) * 60, segmentCount: segments.length, maxFollowups: topic?.max_followups, mode: form.interruptionMode, interruptionCount: interruptions.length, lastInterruptionAt: interruptions.at(-1)?.at ?? null });
     const reason = decision.reason; const question = decision.question;
     const entry = { text, at: seconds, speaker: 'candidate' }; setSegments((s) => [...s, entry]); setTranscript('');
     if (reason) { const item = { reason, question, at: seconds }; setInterruption(item); setInterruptions((s) => [...s, item]); setStage('interrupted'); }
@@ -64,7 +64,7 @@ function App() {
         <label><span>Research direction <em>必填</em></span><input value={form.researchDirection} onChange={update('researchDirection')} placeholder="例如：多智能体系统、强化学习" /></label>
         <label><span>Homepage / introduction <small>可选</small></span><textarea value={form.homepage} onChange={update('homepage')} placeholder="粘贴教授主页或个人介绍…" rows="3" /></label>
         <label><span>Representative papers <small>可选</small></span><input value={form.papers} onChange={update('papers')} placeholder="论文标题，用逗号分隔" /></label>
-        <div className="duration"><label><span>Presentation duration</span><select value={form.duration} onChange={update('duration')}><option value="5">5 minutes</option><option value="3">3 minutes</option><option value="8">8 minutes</option></select></label><button type="submit">Generate Professor <ArrowRight size={17}/></button></div>
+        <div className="duration"><label><span>Presentation duration</span><select value={form.duration} onChange={update('duration')}><option value="5">5 minutes</option><option value="3">3 minutes</option><option value="8">8 minutes</option></select></label><label><span>Professor interruption style</span><select value={form.interruptionMode} onChange={update('interruptionMode')}><option value="none">完全不打断</option><option value="kind">仁慈教授 · 约 2 次</option><option value="pressure">压力教授 · 最多 4 次</option></select></label><button type="submit">Generate Professor <ArrowRight size={17}/></button></div>
         {error && <p className="error">{error}</p>}
       </form>
       <aside className="profile panel">{profile ? <><div className="profile-head"><div className="avatar">{profile.professor_profile.name.slice(0, 1)}</div><div><p className="eyebrow">SIMULATED PROFESSOR</p><h2>{profile.professor_profile.name}</h2><p>{profile.professor_profile.affiliation}</p></div><span className="ready"><Check size={14}/> READY</span></div><div className="profile-block"><h3>研究兴趣</h3><div className="chips">{profile.professor_profile.research_interests.map((x) => <span key={x}>{x}</span>)}</div></div><div className="profile-block"><h3>可能重点关注</h3><ul>{profile.professor_profile.focus.map((x) => <li key={x}>{x}</li>)}</ul></div><div className="profile-block"><h3>交叉点 / 可能追问</h3>{profile.intersections.map((x) => <p className="cross" key={x}>{x}</p>)}</div><div className="profile-note"><span>教授风格</span><p>{profile.professor_profile.style}</p></div><button className="primary-wide" onClick={startPresentation}><Mic size={16}/> Start {form.duration}-minute presentation <ArrowRight size={16}/></button><button className="secondary" onClick={() => { setProfile(null); setStage('setup'); sessionStorage.removeItem('aiic-profile'); }}><RotateCcw size={15}/> Edit setup</button></> : <div className="empty"><BrainCircuit size={30}/><h2>Your professor is waiting.</h2><p>完成左侧 setup 后，这里会生成一位有研究 agenda 的模拟教授。</p></div>}</aside>
