@@ -120,8 +120,11 @@ function App() {
     setSeconds(Number(form.duration) * 60);
     setElapsedSeconds(0);
     setSegments([]);
-    setTranscript("");
+    setTranscript(form.presentation.trim());
     setInterruption(null);
+    setInterruptions([]);
+    setQaAnswer("");
+    setQaLog([]);
     setStage("presenting");
   };
   const submitSegment = async (textOverride) => {
