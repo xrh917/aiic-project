@@ -44,6 +44,8 @@ const initial = {
   interviewMode: "presentation-only",
 };
 
+const modeLabels = { none: "静默观察", kind: "标准追问", pressure: "高压追问" };
+
 function App() {
   const [form, setForm] = useState(
     () => JSON.parse(sessionStorage.getItem("aiic-setup") || "null") || initial,
@@ -62,6 +64,7 @@ function App() {
   const [qaAnswer, setQaAnswer] = useState("");
   const [qaLog, setQaLog] = useState([]);
   const [report, setReport] = useState(null);
+  const [runHistory, setRunHistory] = useState(() => JSON.parse(sessionStorage.getItem("aiic-runs") || "[]"));
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [interruptionVoiceStatus, setInterruptionVoiceStatus] = useState("idle");
   const [error, setError] = useState("");
@@ -211,6 +214,19 @@ function App() {
     setAiBusy(false);
     setReport(next);
     sessionStorage.setItem("aiic-report", JSON.stringify(next));
+    const run = {
+      id: Date.now(),
+      mode: form.interruptionMode,
+      modeLabel: modeLabels[form.interruptionMode] || form.interruptionMode,
+      recovery: next.recovery,
+      interruptionCount: next.interruptionCount,
+      duration: next.duration,
+    };
+    setRunHistory((history) => {
+      const nextHistory = [...history, run].slice(-3);
+      sessionStorage.setItem("aiic-runs", JSON.stringify(nextHistory));
+      return nextHistory;
+    });
     setStage("report");
   };
   const endPresentation = async () => {
@@ -255,8 +271,13 @@ function App() {
     setStage("setup");
     setProfile(null);
     setReport(null);
-    setForm(initial);
-    sessionStorage.clear();
+    setSegments([]);
+    setInterruptions([]);
+    setQaLog([]);
+    setQaAnswer("");
+    setInterruption(null);
+    sessionStorage.removeItem("aiic-profile");
+    sessionStorage.removeItem("aiic-report");
   };
   const clock = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
   if (stage === "presenting" || stage === "interrupted")
@@ -296,7 +317,7 @@ function App() {
       />
     );
   if (stage === "report")
-    return <Report profile={profile} report={report} reset={reset} />;
+    return <Report profile={profile} report={report} reset={reset} runHistory={runHistory} />;
   return (
     <main className="shell">
       <header className="topbar">
@@ -779,7 +800,7 @@ function QA({ profile, index, question, answer, setAnswer, submit }) {
     </main>
   );
 }
-function Report({ profile, report, reset }) {
+function Report({ profile, report, reset, runHistory = [] }) {
   return (
     <main className="report-shell">
       <header className="topbar">
@@ -842,6 +863,21 @@ function Report({ profile, report, reset }) {
             <span>professor interruptions</span>
           </div>
         </div>
+        {runHistory.length > 1 && (
+          <section className="comparison panel">
+            <div className="comparison-head"><h2>同一材料的模式对比</h2><small>最近 {runHistory.length} 轮</small></div>
+            <div className="comparison-grid">
+              {runHistory.map((run) => (
+                <div className="comparison-run" key={run.id}>
+                  <strong>{run.modeLabel}</strong>
+                  <span>恢复 {run.recovery}/100</span>
+                  <span>打断 {run.interruptionCount} 次 · {run.duration}s</span>
+                </div>
+              ))}
+            </div>
+            <p className="comparison-note">保持同一份材料，切换教授模式后重新开始，即可观察不同临场压力下的表现差异。</p>
+          </section>
+        )}
         <section className="evidence panel">
           <h2>最影响判断的问题</h2>
           {report.priorityImprovements?.length || report.evidence?.length ? (
