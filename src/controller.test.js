@@ -4,6 +4,10 @@ import { decideInterruption } from './controller.js';
 test('prioritizes professor-interest signal', () => assert.equal(decideInterruption({ text: 'we use multi-agent systems', interests: ['multi-agent systems'], secondsLeft: 200, totalSeconds: 300, segmentCount: 0 }).reason, 'PROFESSOR INTEREST'));
 test('recognizes bilingual multi-agent signal without exact profile wording', () => assert.equal(decideInterruption({ text: '我们采用了 Multi-Agent framework', interests: ['强化学习'], secondsLeft: 200, totalSeconds: 300, segmentCount: 0 }).reason, 'PROFESSOR INTEREST'));
 test('checks unsupported evidence', () => assert.equal(decideInterruption({ text: '性能提升比较明显', secondsLeft: 200, totalSeconds: 300, segmentCount: 0 }).reason, 'EVIDENCE CHECK'));
+test('does not flag precise contribution or ordinary improvement wording', () => {
+  assert.equal(decideInterruption({ text: '我负责路由逻辑，准确率提升到 78%', mode: 'kind' }).type, 'CONTINUE');
+  assert.equal(decideInterruption({ text: '下一批数据应该选什么会决定模型学到什么', mode: 'kind' }).type, 'CONTINUE');
+});
 test('keeps agenda bounded', () => assert.equal(decideInterruption({ text: 'more details', secondsLeft: 200, totalSeconds: 300, segmentCount: 3, maxFollowups: 1 }).type, 'END_TOPIC'));
 test('does not interrupt on time alone', () => assert.equal(decideInterruption({ text: '这是一段很长的背景说明，没有具体触发信号。'.repeat(30), secondsLeft: 20, totalSeconds: 300, segmentCount: 0 }).type, 'CONTINUE'));
 test('none mode never interrupts', () => assert.equal(decideInterruption({ text: '我们采用 Multi-Agent framework', interests: ['多智能体系统'], mode: 'none' }).type, 'CONTINUE'));
