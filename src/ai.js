@@ -70,6 +70,24 @@ export async function generateQuestionsAI(profile) {
   }
 }
 
+export async function generatePresentationContinuationAI({ profile, presentation, segments, interruption, answer }) {
+  try {
+    const content = await askDeepSeek([
+      { role: "system", content: "你是保研复试中的候选人。只返回一段中文口语化陈述，不要 Markdown，不要解释。回答完教授打断后，承接原有演示稿继续讲 2-4 句，避免重复已经讲过的内容，优先覆盖尚未讲到的实验、局限或下一步。" },
+      { role: "user", content: `原演示稿：${presentation}\n已讲内容：${JSON.stringify(segments)}\n教授打断：${JSON.stringify(interruption)}\n候选人刚才回答：${answer}` },
+    ]);
+    const text = content.trim();
+    if (!text) throw new Error("empty continuation");
+    return text;
+  } catch (error) {
+    console.warn("DeepSeek presentation continuation fallback:", error.message);
+    const source = String(presentation || "").split(/[。！？!?]/).map((part) => part.trim()).filter(Boolean);
+    const used = new Set(segments.map((segment) => String(segment.text || "").slice(0, 24)));
+    const next = source.find((part) => ![...used].some((prefix) => part.startsWith(prefix)));
+    return next ? `${next}。` : "接下来我补充一下刚才还没有展开的实验限制和下一步计划。";
+  }
+}
+
 export async function generateReportAI({ profile, segments, qaLog, fallback }) {
   try {
     const content = await askDeepSeek([

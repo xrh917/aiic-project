@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { generateProfessorProfile } from "./profile";
 import { decideInterruption } from "./controller";
-import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI } from "./ai";
+import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI, generatePresentationContinuationAI } from "./ai";
 import { calculateRecoveryScore } from "./scoring";
 import { analyzeEvidence } from "./feedback";
 import "./styles.css";
@@ -42,6 +42,7 @@ const initial = {
   duration: 5,
   interruptionMode: "kind",
   interviewMode: "presentation-only",
+  demoMode: false,
 };
 
 const modeLabels = { none: "静默观察", kind: "标准追问", pressure: "高压追问" };
@@ -107,6 +108,7 @@ function App() {
         "通过最优控制进行语言模型数据选择；通过分治进行在线成对排序学习；面向序列决策的用户反馈建模",
       duration: 5,
       interruptionMode: "kind",
+      demoMode: true,
     });
   React.useEffect(() => {
     if (stage !== "presenting") return;
@@ -167,13 +169,15 @@ function App() {
       setStage("interrupted");
     }
   };
-  const answerInterruption = (e) => {
+  const answerInterruption = async (e) => {
     e.preventDefault();
     if (!qaAnswer.trim()) return;
+    const answer = qaAnswer.trim();
+    const activeInterruption = interruption;
     setSegments((s) => [
       ...s,
       {
-        text: qaAnswer.trim(),
+        text: answer,
         at: seconds,
         speaker: "candidate",
         interruption: true,
@@ -181,6 +185,18 @@ function App() {
     ]);
     setQaAnswer("");
     setInterruption(null);
+    if (form.demoMode) {
+      setAiBusy(true);
+      const continuation = await generatePresentationContinuationAI({
+        profile,
+        presentation: form.presentation,
+        segments: [...segments, { text: answer, speaker: "candidate", interruption: true }],
+        interruption: activeInterruption,
+        answer,
+      });
+      setAiBusy(false);
+      setTranscript(continuation);
+    }
     setStage("presenting");
   };
   const finishReport = async (answerLog = qaLog) => {
