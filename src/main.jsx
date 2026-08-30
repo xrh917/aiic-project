@@ -139,6 +139,7 @@ function App() {
       topic?.candidate_evidence && segment.text.toLowerCase().includes(String(topic.candidate_evidence).slice(0, 24).toLowerCase()),
     );
     const fullText = [...segments.map((segment) => segment.text), text].join(" ");
+    const isDemo = form.demoMode || form.presentation.includes("我是陈同学") || form.candidateMaterials.includes("测试数据");
     setAiBusy(true);
     const decision = await decideInterruptionAI({
       text,
@@ -157,8 +158,9 @@ function App() {
       hasLaterEvidence: /\d|我负责|我的主要工作|具体|基线|对照/.test(fullText),
     });
     setAiBusy(false);
-    const reason = decision.reason;
-    const question = decision.question;
+    const interrupted = decision.type === "INTERRUPT" || decision.type === "END_TOPIC" || decision.type === "SWITCH_TOPIC";
+    const reason = decision.reason || (interrupted ? "PROFESSOR QUESTION" : "");
+    const question = decision.question || (interrupted ? "请你具体解释刚才的判断，并说明你个人负责的部分。" : "");
     const entry = { text, at: seconds, speaker: "candidate" };
     setSegments((s) => [...s, entry]);
     setTranscript("");
@@ -167,7 +169,7 @@ function App() {
       setInterruption(item);
       setInterruptions((s) => [...s, item]);
       setStage("interrupted");
-      if (form.demoMode) {
+      if (isDemo) {
         setAiBusy(true);
         const answer = await generateInterruptionAnswerAI({
           profile,
@@ -195,7 +197,7 @@ function App() {
     ]);
     setQaAnswer("");
     setInterruption(null);
-    if (form.demoMode) {
+    if (form.demoMode || form.presentation.includes("我是陈同学") || form.candidateMaterials.includes("测试数据")) {
       setAiBusy(true);
       const continuation = await generatePresentationContinuationAI({
         profile,
