@@ -63,6 +63,7 @@ function App() {
   const [qaLog, setQaLog] = useState([]);
   const [report, setReport] = useState(null);
   const [voiceStatus, setVoiceStatus] = useState("idle");
+  const [interruptionVoiceStatus, setInterruptionVoiceStatus] = useState("idle");
   const [error, setError] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const update = (key) => (event) =>
@@ -279,6 +280,8 @@ function App() {
         endPresentation={endPresentation}
         voiceStatus={voiceStatus}
         setVoiceStatus={setVoiceStatus}
+        interruptionVoiceStatus={interruptionVoiceStatus}
+        setInterruptionVoiceStatus={setInterruptionVoiceStatus}
       />
     );
   if (stage === "qa")
@@ -576,6 +579,8 @@ function Presentation({
   endPresentation,
   voiceStatus,
   setVoiceStatus,
+  interruptionVoiceStatus,
+  setInterruptionVoiceStatus,
 }) {
   return (
     <main className="sim-shell">
@@ -708,9 +713,19 @@ function Presentation({
                   placeholder="用文字回答教授…"
                   rows="5"
                 />
-                <button>
-                  <Send size={15} /> Answer & resume
-                </button>
+                <div className="interrupt-actions">
+                  <VoiceButton
+                    voiceStatus={interruptionVoiceStatus}
+                    setVoiceStatus={setInterruptionVoiceStatus}
+                    setTranscript={setQaAnswer}
+                    onSegment={(text) => setQaAnswer((value) => value ? `${value} ${text}` : text)}
+                  />
+                  <button><Send size={15} /> Answer & resume</button>
+                </div>
+                {interruptionVoiceStatus === "listening" && <p className="voice-ready" aria-live="polite"><span /> 可以开始说话</p>}
+                {interruptionVoiceStatus === "unsupported" && <p className="voice-hint">当前浏览器不支持语音识别，请继续使用文字输入。</p>}
+                {interruptionVoiceStatus === "secure-required" && <p className="voice-hint">语音输入需要 HTTPS 安全连接。</p>}
+                {interruptionVoiceStatus === "error" && <p className="voice-hint">麦克风或语音权限不可用，文字输入仍可继续。</p>}
               </form>
             </>
           ) : (
@@ -895,6 +910,10 @@ function VoiceButton({
       onSegmentRef.current(text);
     }, 15000);
     return () => window.clearInterval(id);
+  }, []);
+  React.useEffect(() => () => {
+    activeRef.current = false;
+    recognitionRef.current?.stop();
   }, []);
   const toggle = () => {
     if (!window.isSecureContext) return setVoiceStatus("secure-required");
