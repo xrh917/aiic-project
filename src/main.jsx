@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowRight, BrainCircuit, Check, FileText, FlaskConical, Mic, RotateCcw, UserRound, Clock3, ShieldAlert, Send, BarChart3 } from 'lucide-react';
 import { generateProfessorProfile } from './profile';
+import { decideInterruption } from './controller';
 import './styles.css';
 
 const initial = { candidateMaterials: '', presentation: '', professorName: '', affiliation: '', researchDirection: '', homepage: '', papers: '', duration: 5 };
@@ -34,11 +35,8 @@ function App() {
   const submitSegment = () => {
     const text = transcript.trim(); if (!text) return;
     const lower = text.toLowerCase(); const topic = profile.agenda[Math.min(segments.length, profile.agenda.length - 1)];
-    let reason = null; let question = '';
-    if (profile.professor_profile.research_interests.some((x) => lower.includes(x.toLowerCase()))) { reason = 'PROFESSOR INTEREST'; question = `等一下。你刚才提到${profile.professor_profile.research_interests[0]}，为什么这里必须采用这个方向？`; }
-    else if (/明显|显著|很多|参与|负责|提升|improv|significant/i.test(text) && !(/\d/.test(text))) { reason = 'EVIDENCE CHECK'; question = '先停一下。你说“有明显提升”，具体指标是多少？你个人负责哪一部分？'; }
-    else if (seconds < Number(form.duration) * 60 * 0.55 && text.length > 90) { reason = 'TIME CONTROL'; question = '这一部分不用继续展开，请直接说你的核心贡献。'; }
-    else if (segments.length >= 2 && topic && topic.max_followups <= 1) { reason = 'AGENDA CONTROL'; question = '好，这部分我了解了。我们换一个问题。'; }
+    const decision = decideInterruption({ text, interests: profile.professor_profile.research_interests, secondsLeft: seconds, totalSeconds: Number(form.duration) * 60, segmentCount: segments.length, maxFollowups: topic?.max_followups });
+    const reason = decision.reason; const question = decision.question;
     const entry = { text, at: seconds, speaker: 'candidate' }; setSegments((s) => [...s, entry]); setTranscript('');
     if (reason) { const item = { reason, question, at: seconds }; setInterruption(item); setInterruptions((s) => [...s, item]); setStage('interrupted'); }
   };
