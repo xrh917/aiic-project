@@ -124,3 +124,18 @@ export async function generateReportAI({ profile, segments, qaLog, fallback }) {
     return { ...fallback, evidence: analyzeEvidence(segments, qaLog) };
   }
 }
+
+export async function generateImprovedPresentationAI({ profile, presentation, report }) {
+  try {
+    const content = await askDeepSeek([
+      { role: "system", content: "你是保研复试表达教练。只返回合法 JSON 对象，不要 Markdown。对象包含 script(一份 3-5 分钟、口语化但严谨的中文个人陈述) 和 edits(数组，最多 6 项；每项包含 original、improved、reason)。script 必须保留原材料中的真实事实和数字，不得编造经历；改进应优先解决报告指出的问题，并加入自然自我介绍、个人贡献边界、方法理由和结论边界。" },
+      { role: "user", content: `教授画像：${JSON.stringify(profile?.professor_profile || {})}\n原发言稿：${presentation}\n本轮报告：${JSON.stringify(report)}` },
+    ]);
+    const result = jsonFrom(content);
+    if (!result || typeof result.script !== "string" || !result.script.trim()) throw new Error("invalid improved script");
+    return { script: result.script.trim(), edits: Array.isArray(result.edits) ? result.edits.slice(0, 6) : [] };
+  } catch (error) {
+    console.warn("DeepSeek improved presentation fallback:", error.message);
+    return { script: String(presentation || "").trim(), edits: [] };
+  }
+}

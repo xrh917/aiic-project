@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { generateProfessorProfile } from "./profile";
 import { decideInterruption } from "./controller";
-import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI, generatePresentationContinuationAI, generateInterruptionAnswerAI } from "./ai";
+import { generateProfessorProfileAI, decideInterruptionAI, generateQuestionsAI, generateReportAI, generatePresentationContinuationAI, generateInterruptionAnswerAI, generateImprovedPresentationAI } from "./ai";
 import { calculateRecoveryScore } from "./scoring";
 import { analyzeEvidence } from "./feedback";
 import "./styles.css";
@@ -65,6 +65,7 @@ function App() {
   const [qaAnswer, setQaAnswer] = useState("");
   const [qaLog, setQaLog] = useState([]);
   const [report, setReport] = useState(null);
+  const [improvedScript, setImprovedScript] = useState(null);
   const [runHistory, setRunHistory] = useState(() => JSON.parse(sessionStorage.getItem("aiic-runs") || "[]"));
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [interruptionVoiceStatus, setInterruptionVoiceStatus] = useState("idle");
@@ -315,6 +316,7 @@ function App() {
     setStage("setup");
     setProfile(null);
     setReport(null);
+    setImprovedScript(null);
     setSegments([]);
     setInterruptions([]);
     setQaLog([]);
@@ -322,6 +324,21 @@ function App() {
     setInterruption(null);
     sessionStorage.removeItem("aiic-profile");
     sessionStorage.removeItem("aiic-report");
+  };
+  const optimizePresentation = async () => {
+    if (!profile || !report) return;
+    setAiBusy(true);
+    const result = await generateImprovedPresentationAI({ profile, presentation: form.presentation, report });
+    setImprovedScript(result);
+    setAiBusy(false);
+  };
+  const useImprovedScript = () => {
+    if (!improvedScript?.script) return;
+    const nextForm = { ...form, presentation: improvedScript.script, demoMode: false };
+    setForm(nextForm);
+    sessionStorage.setItem("aiic-setup", JSON.stringify(nextForm));
+    reset();
+    setForm(nextForm);
   };
   const clock = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
   if (stage === "presenting" || stage === "interrupted")
@@ -363,7 +380,7 @@ function App() {
       />
     );
   if (stage === "report")
-    return <Report profile={profile} report={report} reset={reset} runHistory={runHistory} />;
+    return <Report profile={profile} report={report} reset={reset} runHistory={runHistory} improvedScript={improvedScript} optimizePresentation={optimizePresentation} useImprovedScript={useImprovedScript} aiBusy={aiBusy} />;
   return (
     <main className="shell">
       <header className="topbar">
@@ -850,7 +867,7 @@ function QA({ profile, index, question, answer, setAnswer, submit }) {
     </main>
   );
 }
-function Report({ profile, report, reset, runHistory = [] }) {
+function Report({ profile, report, reset, runHistory = [], improvedScript, optimizePresentation, useImprovedScript, aiBusy }) {
   return (
     <main className="report-shell">
       <header className="topbar">
@@ -889,6 +906,21 @@ function Report({ profile, report, reset, runHistory = [] }) {
             </div>
           </section>
         )}
+        <section className="rewrite panel">
+          <div className="rewrite-head">
+            <div><h2>优化发言稿</h2><p>根据本轮证据反馈，生成下一轮可直接练习的版本。</p></div>
+            <button type="button" className="secondary" onClick={optimizePresentation} disabled={aiBusy}>
+              {aiBusy ? "正在优化…" : "生成改进版"}
+            </button>
+          </div>
+          {improvedScript?.script && (
+            <>
+              <div className="improved-script">{improvedScript.script}</div>
+              {improvedScript.edits?.length > 0 && <div className="edit-list"><h3>优化标注</h3>{improvedScript.edits.map((edit, index) => <div className="edit-item" key={index}><div><b>原句</b><del>{edit.original}</del></div><div><b>改写</b><mark>{edit.improved}</mark></div><p>{edit.reason}</p></div>)}</div>}
+              <button type="button" className="primary-wide" onClick={useImprovedScript}>用于下一轮测试 <ArrowRight size={16} /></button>
+            </>
+          )}
+        </section>
         <div className="score-grid">
           <div className="score panel">
             <span>INTERRUPTION RECOVERY</span>
