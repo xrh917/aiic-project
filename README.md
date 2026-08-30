@@ -1,32 +1,39 @@
 # aiic-project
 
-项目简介：在这里补充项目的目标、使用场景和主要能力。
+面向理工科本科生保研复试的 AI Professor Interview Simulator。它根据目标教授与候选人材料生成有研究 agenda 的模拟导师，并在个人陈述中主动打断、控制节奏，最后给出可执行的恢复建议。
 
 ## 开始使用
 
 ### 环境要求
 
-- 在这里列出所需的运行时、工具链和版本。
+- Node.js 20+
 
 ### 安装
 
 ```bash
-# 在这里补充项目依赖安装命令
+npm install
 ```
 
 ### 运行
 
 ```bash
-# 在这里补充本地开发或生产运行命令
+npm run dev
 ```
 
 ## 项目结构
 
-随着代码加入，在此说明关键目录和模块的职责。
+- `src/main.jsx`：Setup、教授画像、Presentation、Q&A、Report 状态流
+- `src/profile.js`：结构化教授画像与 hidden agenda mock 生成
+- `src/controller.js`：教授兴趣、证据、时间和 agenda 控制信号
 
 ## 开发与测试
 
-在此记录格式化、检查和测试命令。
+```bash
+npm test
+npm run build
+```
+
+当前版本使用本地 mock，保留了替换为 OpenAI-compatible LLM 和 ASR 的边界；语音按钮使用浏览器 Speech Recognition，不支持时文字模式仍可完整运行。
 
 ## 贡献
 
